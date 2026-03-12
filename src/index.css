@@ -1,0 +1,48 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@100;200;300;400;500;600;700;800;900&family=Chakra+Petch:wght@300;400;500&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --color-brand: #CA94C9;
+  --color-brand-dark: #A56D9F;
+  --color-brand-light: #E2B8E1;
+  --font-jersey: "Chakra Petch", sans-serif;
+}
+
+@layer utilities {
+  .scrollbar-custom {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-brand) transparent;
+  }
+  
+  .scrollbar-custom::-webkit-scrollbar {
+    height: 6px;
+    width: 6px;
+  }
+  
+  .scrollbar-custom::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  
+  .scrollbar-custom::-webkit-scrollbar-thumb {
+    background-color: var(--color-brand);
+    border-radius: 20px;
+  }
+
+  .scrollbar-custom::-webkit-scrollbar-button:single-button {
+    background-color: transparent;
+    display: block;
+    height: 10px;
+    width: 10px;
+    background-repeat: no-repeat;
+    background-size: contain;
+  }
+
+  /* Setas roxas/brand */
+  .scrollbar-custom::-webkit-scrollbar-button:horizontal:decrement {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%23CA94C9' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m15 18-6-6 6-6'/%3E%3C/svg%3E");
+  }
+
+  .scrollbar-custom::-webkit-scrollbar-button:horizontal:increment {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%23CA94C9' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m9 18 6-6-6-6'/%3E%3C/svg%3E");
+  }
+}
