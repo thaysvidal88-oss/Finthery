@@ -86,6 +86,13 @@ export default function App() {
 
   const [dbError, setDbError] = useState<string | null>(null);
 
+  useEffect(() => {
+    if (dbError) {
+      const timer = setTimeout(() => setDbError(null), 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [dbError]);
+
   const [currentDate, setCurrentDate] = useState(new Date());
   const [showAddModal, setShowAddModal] = useState(false);
   const [modalType, setModalType] = useState<TransactionType>('expense');
@@ -131,19 +138,28 @@ export default function App() {
     if (!session || !supabase) return;
 
     const fetchData = async () => {
-      const [
-        { data: transactionsData },
-        { data: goalsData },
-        { data: investmentsData }
-      ] = await Promise.all([
-        supabase.from('transactions').select('*').order('date', { ascending: false }),
-        supabase.from('goals').select('*'),
-        supabase.from('investments').select('*')
-      ]);
+      try {
+        const [
+          { data: transactionsData, error: tError },
+          { data: goalsData, error: gError },
+          { data: investmentsData, error: iError }
+        ] = await Promise.all([
+          supabase.from('transactions').select('*').order('date', { ascending: false }),
+          supabase.from('goals').select('*'),
+          supabase.from('investments').select('*')
+        ]);
 
-      if (transactionsData) setTransactions(transactionsData);
-      if (goalsData) setGoals(goalsData);
-      if (investmentsData) setInvestments(investmentsData);
+        if (tError || gError || iError) {
+          console.error('Error fetching data:', { tError, gError, iError });
+          setDbError('Erro ao carregar dados do banco de dados.');
+        }
+
+        if (transactionsData) setTransactions(transactionsData);
+        if (goalsData) setGoals(goalsData);
+        if (investmentsData) setInvestments(investmentsData);
+      } catch (err) {
+        console.error('Unexpected error fetching data:', err);
+      }
     };
 
     fetchData();
@@ -298,78 +314,82 @@ export default function App() {
   const mostSpentCategory = categoryData[0];
   const leastSpentCategory = categoryData[categoryData.length - 1];
 
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
   const handleAddTransaction = async (e: React.FormEvent) => {
     e.preventDefault();
+    setIsSubmitting(true);
+    setDbError(null);
+    
     const baseAmount = parseFloat(amount);
     const numInstallments = parseInt(installments);
     const parentId = generateId();
     const newTransactions: Transaction[] = [];
 
-    if (editingTransactionId) {
-      const updatedTransaction = {
-        description,
-        amount: baseAmount,
-        date: parseISO(date).toISOString(),
-        category,
-        type: modalType,
-        paymentMethod,
-        cardName: (paymentMethod === 'Cartão de Crédito' || paymentMethod === 'Cartão de Débito') ? cardName : undefined,
-        cardColor: (paymentMethod === 'Cartão de Crédito' || paymentMethod === 'Cartão de Débito') ? cardColor : undefined,
-      };
-
-      if (session) {
-        const { error } = await supabase.from('transactions').update(updatedTransaction).eq('id', editingTransactionId);
-        if (error) {
-          console.error('Error updating transaction:', error);
-          setDbError('Erro ao atualizar transação no banco de dados.');
-          return;
-        }
-      }
-
-      const updatedTransactions = transactions.map(t => {
-        if (t.id === editingTransactionId) {
-          return { ...t, ...updatedTransaction };
-        }
-        return t;
-      });
-      setTransactions(updatedTransactions);
-    } else {
-      for (let i = 0; i < numInstallments; i++) {
-        const tDate = addMonths(parseISO(date), i);
-        newTransactions.push({
-          id: generateId(),
-          description: numInstallments > 1 ? `${description} (${i + 1}/${numInstallments})` : description,
-          amount: baseAmount / numInstallments,
-          date: tDate.toISOString(),
+    try {
+      if (editingTransactionId) {
+        const updatedTransaction = {
+          description,
+          amount: baseAmount,
+          date: parseISO(date).toISOString(),
           category,
           type: modalType,
           paymentMethod,
           cardName: (paymentMethod === 'Cartão de Crédito' || paymentMethod === 'Cartão de Débito') ? cardName : undefined,
           cardColor: (paymentMethod === 'Cartão de Crédito' || paymentMethod === 'Cartão de Débito') ? cardColor : undefined,
-          installments: numInstallments > 1 ? {
-            current: i + 1,
-            total: numInstallments,
-            parentId
-          } : undefined,
-          user_id: session?.user.id
-        });
-      }
+        };
 
-      if (session) {
-        const { error } = await supabase.from('transactions').insert(newTransactions);
-        if (error) {
-          console.error('Error saving transactions:', error);
-          setDbError('Erro ao salvar transação no banco de dados. Verifique se as tabelas foram criadas.');
-          return;
+        if (session) {
+          const { error } = await supabase.from('transactions').update(updatedTransaction).eq('id', editingTransactionId);
+          if (error) throw error;
         }
+
+        const updatedTransactions = transactions.map(t => {
+          if (t.id === editingTransactionId) {
+            return { ...t, ...updatedTransaction };
+          }
+          return t;
+        });
+        setTransactions(updatedTransactions);
+      } else {
+        for (let i = 0; i < numInstallments; i++) {
+          const tDate = addMonths(parseISO(date), i);
+          newTransactions.push({
+            id: generateId(),
+            description: numInstallments > 1 ? `${description} (${i + 1}/${numInstallments})` : description,
+            amount: baseAmount / numInstallments,
+            date: tDate.toISOString(),
+            category,
+            type: modalType,
+            paymentMethod,
+            cardName: (paymentMethod === 'Cartão de Crédito' || paymentMethod === 'Cartão de Débito') ? cardName : undefined,
+            cardColor: (paymentMethod === 'Cartão de Crédito' || paymentMethod === 'Cartão de Débito') ? cardColor : undefined,
+            installments: numInstallments > 1 ? {
+              current: i + 1,
+              total: numInstallments,
+              parentId
+            } : undefined,
+            user_id: session?.user.id
+          });
+        }
+
+        if (session) {
+          const { error } = await supabase.from('transactions').insert(newTransactions);
+          if (error) throw error;
+        }
+
+        setTransactions([...transactions, ...newTransactions]);
       }
 
-      setTransactions([...transactions, ...newTransactions]);
+      setShowAddModal(false);
+      setEditingTransactionId(null);
+      resetForm();
+    } catch (error: any) {
+      console.error('Error in handleAddTransaction:', error);
+      setDbError(error.message || 'Erro ao processar transação.');
+    } finally {
+      setIsSubmitting(false);
     }
-
-    setShowAddModal(false);
-    setEditingTransactionId(null);
-    resetForm();
   };
 
   const editTransaction = (t: Transaction) => {
@@ -419,6 +439,8 @@ export default function App() {
   const handleAddGoal = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!goalTitle || !goalAmount) return;
+    setIsSubmitting(true);
+    setDbError(null);
 
     const newGoal: Goal = {
       id: generateId(),
@@ -431,22 +453,25 @@ export default function App() {
       user_id: session?.user.id
     };
 
-    if (session) {
-      const { error } = await supabase.from('goals').insert(newGoal);
-      if (error) {
-        console.error('Error saving goal:', error);
-        setDbError('Erro ao salvar meta no banco de dados.');
-        return;
+    try {
+      if (session) {
+        const { error } = await supabase.from('goals').insert(newGoal);
+        if (error) throw error;
       }
-    }
 
-    setGoals([...goals, newGoal]);
-    setShowGoalModal(false);
-    setGoalTitle('');
-    setGoalAmount('');
-    setGoalCurrentAmount('');
-    setGoalDeadline('');
-    setGoalColor('#CA94C9');
+      setGoals([...goals, newGoal]);
+      setShowGoalModal(false);
+      setGoalTitle('');
+      setGoalAmount('');
+      setGoalCurrentAmount('');
+      setGoalDeadline('');
+      setGoalColor('#CA94C9');
+    } catch (error: any) {
+      console.error('Error saving goal:', error);
+      setDbError(error.message || 'Erro ao salvar meta.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const updateGoalAmount = async (id: string, amount: number) => {
@@ -485,61 +510,62 @@ export default function App() {
   const handleInvestmentSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!investmentDescription || !investmentAmount) return;
+    setIsSubmitting(true);
+    setDbError(null);
 
-    if (editingInvestmentId) {
-      const updatedInvestment = {
-        description: investmentDescription,
-        amount: parseFloat(investmentAmount),
-        targetAmount: investmentTargetAmount ? parseFloat(investmentTargetAmount) : undefined,
-        date: investmentDate,
-        type: investmentType,
-        color: investmentColor
-      };
+    try {
+      if (editingInvestmentId) {
+        const updatedInvestment = {
+          description: investmentDescription,
+          amount: parseFloat(investmentAmount),
+          targetAmount: investmentTargetAmount ? parseFloat(investmentTargetAmount) : undefined,
+          date: investmentDate,
+          type: investmentType,
+          color: investmentColor
+        };
 
-      if (session) {
-        const { error } = await supabase.from('investments').update(updatedInvestment).eq('id', editingInvestmentId);
-        if (error) {
-          console.error('Error updating investment:', error);
-          setDbError('Erro ao atualizar investimento no banco de dados.');
-          return;
+        if (session) {
+          const { error } = await supabase.from('investments').update(updatedInvestment).eq('id', editingInvestmentId);
+          if (error) throw error;
         }
+
+        setInvestments(investments.map(i => i.id === editingInvestmentId ? {
+          ...i,
+          ...updatedInvestment
+        } : i));
+      } else {
+        const newInvestment: Investment = {
+          id: generateId(),
+          description: investmentDescription,
+          amount: parseFloat(investmentAmount),
+          targetAmount: investmentTargetAmount ? parseFloat(investmentTargetAmount) : undefined,
+          date: investmentDate,
+          type: investmentType,
+          color: investmentColor,
+          user_id: session?.user.id
+        };
+
+        if (session) {
+          const { error } = await supabase.from('investments').insert(newInvestment);
+          if (error) throw error;
+        }
+
+        setInvestments([...investments, newInvestment]);
       }
 
-      setInvestments(investments.map(i => i.id === editingInvestmentId ? {
-        ...i,
-        ...updatedInvestment
-      } : i));
-    } else {
-      const newInvestment: Investment = {
-        id: generateId(),
-        description: investmentDescription,
-        amount: parseFloat(investmentAmount),
-        targetAmount: investmentTargetAmount ? parseFloat(investmentTargetAmount) : undefined,
-        date: investmentDate,
-        type: investmentType,
-        color: investmentColor,
-        user_id: session?.user.id
-      };
-
-      if (session) {
-        const { error } = await supabase.from('investments').insert(newInvestment);
-        if (error) {
-          console.error('Error saving investment:', error);
-          setDbError('Erro ao salvar investimento no banco de dados.');
-          return;
-        }
-      }
-
-      setInvestments([...investments, newInvestment]);
+      setShowInvestmentModal(false);
+      setInvestmentDescription('');
+      setInvestmentAmount('');
+      setInvestmentTargetAmount('');
+      setInvestmentDate(format(new Date(), 'yyyy-MM-dd'));
+      setInvestmentColor('#CA94C9');
+      setEditingInvestmentId(null);
+    } catch (error: any) {
+      console.error('Error in handleInvestmentSubmit:', error);
+      setDbError(error.message || 'Erro ao processar investimento.');
+    } finally {
+      setIsSubmitting(false);
     }
-
-    setShowInvestmentModal(false);
-    setInvestmentDescription('');
-    setInvestmentAmount('');
-    setInvestmentTargetAmount('');
-    setInvestmentDate(format(new Date(), 'yyyy-MM-dd'));
-    setInvestmentColor('#CA94C9');
-    setEditingInvestmentId(null);
   };
 
   const deleteInvestment = async (id: string) => {
@@ -1207,6 +1233,12 @@ export default function App() {
         </div>
       </main>
 
+      <footer className="pb-12 pt-6 text-center opacity-30 hover:opacity-100 transition-opacity">
+        <p className="text-zinc-500 text-[10px] font-bold uppercase tracking-[0.3em]">
+          By: Thays Vidal
+        </p>
+      </footer>
+
       {/* Investment Modal */}
       {showInvestmentModal && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
@@ -1321,9 +1353,10 @@ export default function App() {
                 </button>
                 <button 
                   type="submit"
-                  className="flex-1 bg-brand hover:bg-brand-dark text-white font-bold py-3 rounded-xl transition-all shadow-lg shadow-brand/20"
+                  disabled={isSubmitting}
+                  className="flex-1 bg-brand hover:bg-brand-dark disabled:opacity-50 text-white font-bold py-3 rounded-xl transition-all shadow-lg shadow-brand/20 flex items-center justify-center gap-2"
                 >
-                  {editingInvestmentId ? 'Salvar' : 'Adicionar'}
+                  {isSubmitting ? <Loader2 className="animate-spin" size={20} /> : (editingInvestmentId ? 'Salvar' : 'Adicionar')}
                 </button>
               </div>
             </form>
@@ -1462,9 +1495,10 @@ export default function App() {
                 </button>
                 <button 
                   type="submit"
-                  className="flex-1 bg-brand-dark hover:bg-brand py-3 rounded-xl font-black transition-colors uppercase tracking-widest text-xs"
+                  disabled={isSubmitting}
+                  className="flex-1 bg-brand-dark hover:bg-brand disabled:opacity-50 py-3 rounded-xl font-black transition-colors uppercase tracking-widest text-xs flex items-center justify-center gap-2"
                 >
-                  Salvar
+                  {isSubmitting ? <Loader2 className="animate-spin" size={16} /> : 'Salvar'}
                 </button>
               </div>
             </form>
@@ -1570,9 +1604,10 @@ export default function App() {
                 </button>
                 <button 
                   type="submit"
-                  className="flex-1 bg-brand-dark hover:bg-brand py-3 rounded-xl font-black transition-colors uppercase tracking-widest text-xs"
+                  disabled={isSubmitting}
+                  className="flex-1 bg-brand-dark hover:bg-brand disabled:opacity-50 py-3 rounded-xl font-black transition-colors uppercase tracking-widest text-xs flex items-center justify-center gap-2"
                 >
-                  Criar Meta
+                  {isSubmitting ? <Loader2 className="animate-spin" size={16} /> : 'Criar Meta'}
                 </button>
               </div>
             </form>
