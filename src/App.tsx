@@ -84,6 +84,8 @@ export default function App() {
     return saved ? JSON.parse(saved) : [];
   });
 
+  const [dbError, setDbError] = useState<string | null>(null);
+
   const [currentDate, setCurrentDate] = useState(new Date());
   const [showAddModal, setShowAddModal] = useState(false);
   const [modalType, setModalType] = useState<TransactionType>('expense');
@@ -319,6 +321,7 @@ export default function App() {
         const { error } = await supabase.from('transactions').update(updatedTransaction).eq('id', editingTransactionId);
         if (error) {
           console.error('Error updating transaction:', error);
+          setDbError('Erro ao atualizar transação no banco de dados.');
           return;
         }
       }
@@ -356,6 +359,7 @@ export default function App() {
         const { error } = await supabase.from('transactions').insert(newTransactions);
         if (error) {
           console.error('Error saving transactions:', error);
+          setDbError('Erro ao salvar transação no banco de dados. Verifique se as tabelas foram criadas.');
           return;
         }
       }
@@ -431,6 +435,7 @@ export default function App() {
       const { error } = await supabase.from('goals').insert(newGoal);
       if (error) {
         console.error('Error saving goal:', error);
+        setDbError('Erro ao salvar meta no banco de dados.');
         return;
       }
     }
@@ -495,6 +500,7 @@ export default function App() {
         const { error } = await supabase.from('investments').update(updatedInvestment).eq('id', editingInvestmentId);
         if (error) {
           console.error('Error updating investment:', error);
+          setDbError('Erro ao atualizar investimento no banco de dados.');
           return;
         }
       }
@@ -519,6 +525,7 @@ export default function App() {
         const { error } = await supabase.from('investments').insert(newInvestment);
         if (error) {
           console.error('Error saving investment:', error);
+          setDbError('Erro ao salvar investimento no banco de dados.');
           return;
         }
       }
@@ -590,6 +597,18 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-black text-white font-sans relative overflow-x-hidden scrollbar-custom">
+      {dbError && (
+        <div className="fixed bottom-4 right-4 z-[100] bg-rose-500 text-white px-6 py-3 rounded-xl shadow-2xl flex items-center gap-3 animate-in fade-in slide-in-from-bottom-4">
+          <AlertCircle size={20} />
+          <div className="flex flex-col">
+            <span className="font-bold text-sm">Erro no Banco de Dados</span>
+            <span className="text-xs opacity-90">{dbError}</span>
+          </div>
+          <button onClick={() => setDbError(null)} className="ml-2 hover:bg-white/20 p-1 rounded-lg">
+            <Plus className="rotate-45" size={16} />
+          </button>
+        </div>
+      )}
       {/* Header with Gradient */}
       {/* Header Section with Galaxy Effect */}
       <div className="relative overflow-hidden bg-gradient-to-br from-[#1a0b1a] via-[#0f050f] to-black pt-12 pb-20 px-4 md:px-8 border-b border-zinc-800/50 z-10">
