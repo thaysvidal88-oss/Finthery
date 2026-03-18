@@ -1,16 +1,39 @@
 import React, { useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { motion } from 'motion/react';
-import { LogIn, UserPlus, Mail, Lock, Loader2, AlertCircle } from 'lucide-react';
+import { LogIn, UserPlus, Mail, Lock, Loader2, AlertCircle, Eye, EyeOff, KeyRound } from 'lucide-react';
 import { cn } from '../utils';
 
 export function Auth() {
   const [loading, setLoading] = useState(false);
   const [isSignUp, setIsSignUp] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+
+  const handleResetPassword = async () => {
+    if (!email) {
+      setError('Por favor, digite seu e-mail primeiro.');
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    setMessage(null);
+
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: window.location.origin,
+      });
+      if (error) throw error;
+      setMessage('E-mail de recuperação enviado! Verifique sua caixa de entrada.');
+    } catch (err: any) {
+      setError(err.message || 'Erro ao enviar e-mail de recuperação.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -19,13 +42,22 @@ export function Auth() {
     setMessage(null);
 
     try {
-      console.log('Iniciando autenticação...', { isSignUp, email });
       if (isSignUp) {
+        // Verificar se o e-mail está na whitelist (allowed_users)
+        const { data: allowed, error: allowedError } = await supabase
+          .from('allowed_users')
+          .select('email')
+          .eq('email', email.toLowerCase())
+          .single();
+
+        if (allowedError || !allowed) {
+          throw new Error('Este e-mail não está autorizado para cadastro. Entre em contato com a Thays.');
+        }
+
         const { data, error } = await supabase.auth.signUp({
           email,
           password,
         });
-        console.log('Resposta SignUp:', { data, error });
         if (error) throw error;
         setMessage('Cadastro realizado! Verifique seu e-mail para confirmar.');
       } else {
@@ -33,7 +65,6 @@ export function Auth() {
           email,
           password,
         });
-        console.log('Resposta SignIn:', { data, error });
         if (error) throw error;
       }
     } catch (err: any) {
@@ -77,17 +108,35 @@ export function Auth() {
           </div>
 
           <div>
-            <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-1 ml-1">Senha</label>
+            <div className="flex justify-between items-end mb-1 ml-1">
+              <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Senha</label>
+              {!isSignUp && (
+                <button 
+                  type="button"
+                  onClick={handleResetPassword}
+                  className="text-[10px] font-bold text-brand hover:text-brand-dark uppercase tracking-widest transition-colors"
+                >
+                  Esqueci minha senha
+                </button>
+              )}
+            </div>
             <div className="relative">
               <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500" size={18} />
               <input 
                 required
-                type="password" 
+                type={showPassword ? "text" : "password"} 
                 value={password}
                 onChange={e => setPassword(e.target.value)}
-                className="w-full bg-zinc-800 border border-zinc-700 rounded-xl pl-12 pr-4 py-3 focus:outline-none focus:border-brand transition-colors font-bold text-white"
+                className="w-full bg-zinc-800 border border-zinc-700 rounded-xl pl-12 pr-12 py-3 focus:outline-none focus:border-brand transition-colors font-bold text-white"
                 placeholder="••••••••"
               />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-4 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300 transition-colors"
+              >
+                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
             </div>
           </div>
 
