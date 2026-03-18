@@ -8,10 +8,41 @@ export function Auth() {
   const [loading, setLoading] = useState(false);
   const [isSignUp, setIsSignUp] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [showRequestAccess, setShowRequestAccess] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+
+  const handleRequestAccess = async () => {
+    if (!email) {
+      setError('Por favor, digite seu e-mail.');
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    setMessage(null);
+
+    try {
+      const { error } = await supabase
+        .from('access_requests')
+        .insert([{ email: email.toLowerCase(), status: 'pending' }]);
+      
+      if (error) {
+        if (error.code === '23505') {
+          throw new Error('Você já solicitou acesso. Por favor, aguarde a aprovação da Thays.');
+        }
+        throw error;
+      }
+      
+      setMessage('Solicitação enviada com sucesso! A Thays será notificada.');
+      setShowRequestAccess(false);
+    } catch (err: any) {
+      setError(err.message || 'Erro ao solicitar acesso.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleResetPassword = async () => {
     if (!email) {
@@ -51,7 +82,8 @@ export function Auth() {
           .single();
 
         if (allowedError || !allowed) {
-          throw new Error('Este e-mail não está autorizado para cadastro. Entre em contato com a Thays.');
+          setShowRequestAccess(true);
+          throw new Error('Este e-mail não está autorizado para cadastro. Clique no botão abaixo para solicitar acesso.');
         }
 
         const { data, error } = await supabase.auth.signUp({
@@ -167,6 +199,17 @@ export function Auth() {
               <><LogIn size={20} /> Entrar</>
             )}
           </button>
+
+          {showRequestAccess && (
+            <button 
+              type="button"
+              onClick={handleRequestAccess}
+              disabled={loading}
+              className="w-full bg-zinc-800 hover:bg-zinc-700 text-white py-4 rounded-xl font-bold transition-all uppercase tracking-widest text-xs flex items-center justify-center gap-2"
+            >
+              {loading ? <Loader2 className="animate-spin" size={16} /> : 'Solicitar Acesso à Thays'}
+            </button>
+          )}
         </form>
 
         <div className="mt-8 text-center">

@@ -85,13 +85,74 @@ export default function App() {
   });
 
   const [dbError, setDbError] = useState<string | null>(null);
+  const [showAdminPanel, setShowAdminPanel] = useState(false);
+  const [accessRequests, setAccessRequests] = useState<any[]>([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const isAdmin = session?.user.email === 'thays.desktop@gmail.com';
 
   useEffect(() => {
-    if (dbError) {
-      const timer = setTimeout(() => setDbError(null), 5000);
-      return () => clearTimeout(timer);
+    if (isAdmin && showAdminPanel) {
+      fetchAccessRequests();
     }
-  }, [dbError]);
+  }, [isAdmin, showAdminPanel]);
+
+  const fetchAccessRequests = async () => {
+    const { data, error } = await supabase
+      .from('access_requests')
+      .select('*')
+      .order('created_at', { ascending: false });
+    
+    if (!error && data) {
+      setAccessRequests(data);
+    }
+  };
+
+  const handleApproveRequest = async (request: any) => {
+    setIsSubmitting(true);
+    try {
+      // 1. Adicionar à whitelist
+      const { error: whitelistError } = await supabase
+        .from('allowed_users')
+        .insert([{ email: request.email }]);
+      
+      if (whitelistError && whitelistError.code !== '23505') throw whitelistError;
+
+      // 2. Atualizar status da solicitação
+      const { error: updateError } = await supabase
+        .from('access_requests')
+        .update({ status: 'approved' })
+        .eq('id', request.id);
+      
+      if (updateError) throw updateError;
+
+      setAccessRequests(accessRequests.map(r => r.id === request.id ? { ...r, status: 'approved' } : r));
+    } catch (error: any) {
+      console.error('Erro ao aprovar:', error);
+      setDbError('Erro ao aprovar solicitação.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleRejectRequest = async (id: string) => {
+    setIsSubmitting(true);
+    try {
+      const { error } = await supabase
+        .from('access_requests')
+        .update({ status: 'rejected' })
+        .eq('id', id);
+      
+      if (error) throw error;
+
+      setAccessRequests(accessRequests.map(r => r.id === id ? { ...r, status: 'rejected' } : r));
+    } catch (error: any) {
+      console.error('Erro ao rejeitar:', error);
+      setDbError('Erro ao rejeitar solicitação.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   const [currentDate, setCurrentDate] = useState(new Date());
   const [showAddModal, setShowAddModal] = useState(false);
@@ -313,8 +374,6 @@ export default function App() {
 
   const mostSpentCategory = categoryData[0];
   const leastSpentCategory = categoryData[categoryData.length - 1];
-
-  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleAddTransaction = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -698,6 +757,14 @@ export default function App() {
           </div>
           
           <div className="flex items-center gap-3">
+            {isAdmin && (
+              <button 
+                onClick={() => setShowAdminPanel(true)}
+                className="bg-brand/10 hover:bg-brand/20 text-brand p-2 rounded-lg transition-all flex items-center gap-2 text-xs font-bold uppercase tracking-widest"
+              >
+                <User size={16} /> Admin
+              </button>
+            )}
             <button 
               onClick={() => supabase.auth.signOut()}
               className="bg-zinc-800/50 hover:bg-zinc-800 p-2 rounded-lg text-zinc-400 hover:text-white transition-all flex items-center gap-2 text-xs font-bold"
@@ -1611,6 +1678,70 @@ export default function App() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+      {/* Admin Panel Modal */}
+      {showAdminPanel && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-zinc-900 border border-zinc-800 w-full max-w-2xl rounded-3xl p-8 shadow-2xl max-h-[80vh] overflow-y-auto">
+            <div className="flex justify-between items-center mb-8">
+              <h3 className="text-2xl font-black flex items-center gap-2 uppercase tracking-tighter">
+                <User className="text-brand" /> Painel Admin
+              </h3>
+              <button 
+                onClick={() => setShowAdminPanel(false)}
+                className="text-zinc-500 hover:text-white transition-colors"
+              >
+                Fechar
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              {accessRequests.length === 0 ? (
+                <p className="text-center text-zinc-500 py-12 font-bold uppercase tracking-widest text-xs">
+                  Nenhuma solicitação pendente
+                </p>
+              ) : (
+                accessRequests.map((req) => (
+                  <div key={req.id} className="bg-zinc-800/50 border border-zinc-700/50 p-4 rounded-2xl flex items-center justify-between gap-4">
+                    <div>
+                      <p className="font-bold text-white">{req.email}</p>
+                      <p className="text-[10px] text-zinc-500 uppercase tracking-widest font-bold">
+                        Solicitado em: {format(parseISO(req.created_at), "dd/MM/yyyy HH:mm", { locale: ptBR })}
+                      </p>
+                      <span className={cn(
+                        "inline-block mt-2 px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-widest",
+                        req.status === 'pending' ? "bg-amber-500/10 text-amber-500" :
+                        req.status === 'approved' ? "bg-emerald-500/10 text-emerald-500" :
+                        "bg-rose-500/10 text-rose-500"
+                      )}>
+                        {req.status === 'pending' ? 'Pendente' : req.status === 'approved' ? 'Aprovado' : 'Rejeitado'}
+                      </span>
+                    </div>
+                    
+                    {req.status === 'pending' && (
+                      <div className="flex gap-2">
+                        <button 
+                          onClick={() => handleRejectRequest(req.id)}
+                          disabled={isSubmitting}
+                          className="bg-rose-500/10 hover:bg-rose-500 text-rose-500 hover:text-white p-2 rounded-xl transition-all"
+                        >
+                          <Minus size={18} />
+                        </button>
+                        <button 
+                          onClick={() => handleApproveRequest(req)}
+                          disabled={isSubmitting}
+                          className="bg-emerald-500/10 hover:bg-emerald-500 text-emerald-500 hover:text-white p-2 rounded-xl transition-all"
+                        >
+                          <Plus size={18} />
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                ))
+              )}
+            </div>
           </div>
         </div>
       )}
