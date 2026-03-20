@@ -6,12 +6,13 @@ import { cn } from '../utils';
 
 interface AuthProps {
   onPasswordResetComplete?: () => void;
+  isInitialResetMode?: boolean;
 }
 
-export function Auth({ onPasswordResetComplete }: AuthProps) {
+export function Auth({ onPasswordResetComplete, isInitialResetMode }: AuthProps) {
   const [loading, setLoading] = useState(false);
   const [isSignUp, setIsSignUp] = useState(false);
-  const [isResettingPassword, setIsResettingPassword] = useState(false);
+  const [isResettingPassword, setIsResettingPassword] = useState(isInitialResetMode || false);
   const [showPassword, setShowPassword] = useState(false);
   const [showRequestAccess, setShowRequestAccess] = useState(false);
   const [email, setEmail] = useState('');
@@ -43,7 +44,14 @@ export function Auth({ onPasswordResetComplete }: AuthProps) {
     try {
       const { error } = await supabase.auth.updateUser({ password });
       if (error) throw error;
-      setMessage('Senha atualizada com sucesso! Você já pode entrar.');
+      
+      // Sign out to force user to login with new password
+      await supabase.auth.signOut();
+      
+      // Clear URL hash to prevent re-triggering recovery mode
+      window.history.replaceState(null, '', window.location.pathname);
+      
+      setMessage('Senha atualizada com sucesso! Por favor, entre com sua nova senha.');
       setIsResettingPassword(false);
       setIsSignUp(false);
       if (onPasswordResetComplete) {

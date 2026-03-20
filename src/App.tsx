@@ -66,7 +66,9 @@ const CARD_COLORS = [
 export default function App() {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
-  const [isResettingPassword, setIsResettingPassword] = useState(false);
+  const [isResettingPassword, setIsResettingPassword] = useState(() => 
+    window.location.hash.includes('type=recovery')
+  );
   const [userName, setUserName] = useState(() => localStorage.getItem('finthery_user_name') || localStorage.getItem('financas_user_name') || '');
   const [isEditingName, setIsEditingName] = useState(!userName);
   
@@ -681,7 +683,12 @@ export default function App() {
   }
 
   if (!session || isResettingPassword) {
-    return <Auth onPasswordResetComplete={() => setIsResettingPassword(false)} />;
+    return (
+      <Auth 
+        isInitialResetMode={isResettingPassword}
+        onPasswordResetComplete={() => setIsResettingPassword(false)} 
+      />
+    );
   }
 
   return (
