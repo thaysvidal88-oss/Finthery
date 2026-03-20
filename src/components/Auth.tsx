@@ -1,18 +1,60 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { motion } from 'motion/react';
-import { LogIn, UserPlus, Mail, Lock, Loader2, AlertCircle, Eye, EyeOff, KeyRound } from 'lucide-react';
+import { LogIn, UserPlus, Mail, Lock, Loader2, AlertCircle, Eye, EyeOff, KeyRound, CheckCircle2 } from 'lucide-react';
 import { cn } from '../utils';
 
-export function Auth() {
+interface AuthProps {
+  onPasswordResetComplete?: () => void;
+}
+
+export function Auth({ onPasswordResetComplete }: AuthProps) {
   const [loading, setLoading] = useState(false);
   const [isSignUp, setIsSignUp] = useState(false);
+  const [isResettingPassword, setIsResettingPassword] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showRequestAccess, setShowRequestAccess] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    // Listen for password recovery event
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'PASSWORD_RECOVERY') {
+        setIsResettingPassword(true);
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const handleUpdatePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (password.length < 6) {
+      setError('A senha deve ter pelo menos 6 caracteres.');
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    setMessage(null);
+
+    try {
+      const { error } = await supabase.auth.updateUser({ password });
+      if (error) throw error;
+      setMessage('Senha atualizada com sucesso! Você já pode entrar.');
+      setIsResettingPassword(false);
+      setIsSignUp(false);
+      if (onPasswordResetComplete) {
+        onPasswordResetComplete();
+      }
+    } catch (err: any) {
+      setError(err.message || 'Erro ao atualizar senha.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleRequestAccess = async () => {
     if (!email) {
@@ -119,11 +161,63 @@ export function Auth() {
             Finthery
           </h1>
           <p className="text-zinc-500 text-sm uppercase tracking-widest font-bold">
-            {isSignUp ? 'Crie sua conta' : 'Acesse sua conta'}
+            {isResettingPassword ? 'Definir Nova Senha' : isSignUp ? 'Crie sua conta' : 'Acesse sua conta'}
           </p>
         </div>
 
-        <form onSubmit={handleAuth} className="space-y-4">
+        {isResettingPassword ? (
+          <form onSubmit={handleUpdatePassword} className="space-y-4">
+            <div>
+              <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-1 ml-1">Nova Senha</label>
+              <div className="relative">
+                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500" size={18} />
+                <input 
+                  required
+                  type={showPassword ? "text" : "password"} 
+                  value={password}
+                  onChange={e => setPassword(e.target.value)}
+                  className="w-full bg-zinc-800 border border-zinc-700 rounded-xl pl-12 pr-12 py-3 focus:outline-none focus:border-brand transition-colors font-bold text-white"
+                  placeholder="••••••••"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300 transition-colors"
+                >
+                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
+              </div>
+            </div>
+
+            {error && (
+              <div className="bg-rose-500/10 border border-rose-500/20 text-rose-500 p-3 rounded-xl flex items-center gap-2 text-xs font-bold">
+                <AlertCircle size={16} />
+                {error}
+              </div>
+            )}
+
+            <button 
+              disabled={loading}
+              type="submit"
+              className="w-full bg-brand-dark hover:bg-brand disabled:opacity-50 py-4 rounded-xl font-black transition-all uppercase tracking-widest text-sm flex items-center justify-center gap-2 shadow-lg shadow-brand/20"
+            >
+              {loading ? <Loader2 className="animate-spin" size={20} /> : <><CheckCircle2 size={20} /> Atualizar Senha</>}
+            </button>
+
+            <button 
+              type="button"
+              onClick={() => {
+                setIsResettingPassword(false);
+                if (onPasswordResetComplete) onPasswordResetComplete();
+              }}
+              className="w-full text-zinc-500 hover:text-white text-[10px] font-bold uppercase tracking-widest transition-colors"
+            >
+              Cancelar
+            </button>
+          </form>
+        ) : (
+          <>
+            <form onSubmit={handleAuth} className="space-y-4">
           <div>
             <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-1 ml-1">E-mail</label>
             <div className="relative">
@@ -224,7 +318,9 @@ export function Auth() {
             {isSignUp ? 'Já tem uma conta? Entre aqui' : 'Não tem uma conta? Cadastre-se'}
           </button>
         </div>
-      </motion.div>
-    </div>
-  );
+      </>
+    )}
+  </motion.div>
+</div>
+);
 }

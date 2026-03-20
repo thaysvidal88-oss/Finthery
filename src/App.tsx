@@ -66,6 +66,7 @@ const CARD_COLORS = [
 export default function App() {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isResettingPassword, setIsResettingPassword] = useState(false);
   const [userName, setUserName] = useState(() => localStorage.getItem('finthery_user_name') || localStorage.getItem('financas_user_name') || '');
   const [isEditingName, setIsEditingName] = useState(!userName);
   
@@ -187,8 +188,11 @@ export default function App() {
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
+    } = supabase.auth.onAuthStateChange((event, session) => {
       setSession(session);
+      if (event === 'PASSWORD_RECOVERY') {
+        setIsResettingPassword(true);
+      }
     });
 
     return () => subscription.unsubscribe();
@@ -676,8 +680,8 @@ export default function App() {
     );
   }
 
-  if (!session) {
-    return <Auth />;
+  if (!session || isResettingPassword) {
+    return <Auth onPasswordResetComplete={() => setIsResettingPassword(false)} />;
   }
 
   return (
