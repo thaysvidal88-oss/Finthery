@@ -80,12 +80,12 @@ export function Auth({ onPasswordResetComplete, isInitialResetMode }: AuthProps)
       
       if (error) {
         if (error.code === '23505') {
-          throw new Error('Você já solicitou acesso. Por favor, aguarde a aprovação da Thays.');
+          throw new Error('Você já solicitou acesso. Por favor, aguarde a aprovação do administrador.');
         }
         throw error;
       }
       
-      setMessage('Solicitação enviada com sucesso! A Thays será notificada.');
+      setMessage('Solicitação enviada com sucesso! O administrador será notificado.');
       setShowRequestAccess(false);
     } catch (err: any) {
       setError(err.message || 'Erro ao solicitar acesso.');
@@ -123,19 +123,19 @@ export function Auth({ onPasswordResetComplete, isInitialResetMode }: AuthProps)
     setMessage(null);
 
     try {
+      // Verificar se o e-mail está na whitelist (allowed_users)
+      const { data: allowed, error: allowedError } = await supabase
+        .from('allowed_users')
+        .select('email')
+        .eq('email', email.toLowerCase())
+        .single();
+
+      if (allowedError || !allowed) {
+        setShowRequestAccess(true);
+        throw new Error('Este e-mail não está autorizado. Clique no botão abaixo para solicitar acesso.');
+      }
+
       if (isSignUp) {
-        // Verificar se o e-mail está na whitelist (allowed_users)
-        const { data: allowed, error: allowedError } = await supabase
-          .from('allowed_users')
-          .select('email')
-          .eq('email', email.toLowerCase())
-          .single();
-
-        if (allowedError || !allowed) {
-          setShowRequestAccess(true);
-          throw new Error('Este e-mail não está autorizado para cadastro. Clique no botão abaixo para solicitar acesso.');
-        }
-
         const { data, error } = await supabase.auth.signUp({
           email,
           password,
@@ -309,7 +309,7 @@ export function Auth({ onPasswordResetComplete, isInitialResetMode }: AuthProps)
               disabled={loading}
               className="w-full bg-zinc-800 hover:bg-zinc-700 text-white py-4 rounded-xl font-bold transition-all uppercase tracking-widest text-xs flex items-center justify-center gap-2"
             >
-              {loading ? <Loader2 className="animate-spin" size={16} /> : 'Solicitar Acesso à Thays'}
+              {loading ? <Loader2 className="animate-spin" size={16} /> : 'Solicitar Acesso ao Administrador'}
             </button>
           )}
         </form>

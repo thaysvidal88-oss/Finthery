@@ -69,28 +69,18 @@ export default function App() {
   const [isResettingPassword, setIsResettingPassword] = useState(() => 
     window.location.hash.includes('type=recovery')
   );
-  const [userName, setUserName] = useState(() => localStorage.getItem('finthery_user_name') || localStorage.getItem('financas_user_name') || '');
-  const [isEditingName, setIsEditingName] = useState(!userName);
+  const [userName, setUserName] = useState('');
+  const [isEditingName, setIsEditingName] = useState(false);
   
-  const [transactions, setTransactions] = useState<Transaction[]>(() => {
-    const saved = localStorage.getItem('finthery_transactions') || localStorage.getItem('financas_transactions');
-    return saved ? JSON.parse(saved) : [];
-  });
-
-  const [goals, setGoals] = useState<Goal[]>(() => {
-    const saved = localStorage.getItem('finthery_goals') || localStorage.getItem('financas_goals');
-    return saved ? JSON.parse(saved) : [];
-  });
-
-  const [investments, setInvestments] = useState<Investment[]>(() => {
-    const saved = localStorage.getItem('finthery_investments');
-    return saved ? JSON.parse(saved) : [];
-  });
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [goals, setGoals] = useState<Goal[]>([]);
+  const [investments, setInvestments] = useState<Investment[]>([]);
 
   const [dbError, setDbError] = useState<string | null>(null);
   const [showAdminPanel, setShowAdminPanel] = useState(false);
   const [accessRequests, setAccessRequests] = useState<any[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [confirmAction, setConfirmAction] = useState<{ id: string, type: 'approve' | 'reject' | 'delete', email?: string } | null>(null);
 
   const isAdmin = session?.user.email === 'thays.desktop@gmail.com';
 
@@ -113,11 +103,12 @@ export default function App() {
 
   const handleApproveRequest = async (request: any) => {
     setIsSubmitting(true);
+    setDbError(null);
     try {
       // 1. Adicionar à whitelist
       const { error: whitelistError } = await supabase
         .from('allowed_users')
-        .insert([{ email: request.email }]);
+        .insert([{ email: request.email.toLowerCase() }]);
       
       if (whitelistError && whitelistError.code !== '23505') throw whitelistError;
 
@@ -130,9 +121,10 @@ export default function App() {
       if (updateError) throw updateError;
 
       setAccessRequests(accessRequests.map(r => r.id === request.id ? { ...r, status: 'approved' } : r));
+      setConfirmAction(null);
     } catch (error: any) {
       console.error('Erro ao aprovar:', error);
-      setDbError('Erro ao aprovar solicitação.');
+      setDbError(error.message || 'Erro ao aprovar solicitação.');
     } finally {
       setIsSubmitting(false);
     }
@@ -140,6 +132,7 @@ export default function App() {
 
   const handleRejectRequest = async (id: string) => {
     setIsSubmitting(true);
+    setDbError(null);
     try {
       const { error } = await supabase
         .from('access_requests')
@@ -149,9 +142,31 @@ export default function App() {
       if (error) throw error;
 
       setAccessRequests(accessRequests.map(r => r.id === id ? { ...r, status: 'rejected' } : r));
+      setConfirmAction(null);
     } catch (error: any) {
       console.error('Erro ao rejeitar:', error);
-      setDbError('Erro ao rejeitar solicitação.');
+      setDbError(error.message || 'Erro ao rejeitar solicitação.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleDeleteRequest = async (id: string) => {
+    setIsSubmitting(true);
+    setDbError(null);
+    try {
+      const { error } = await supabase
+        .from('access_requests')
+        .delete()
+        .eq('id', id);
+      
+      if (error) throw error;
+
+      setAccessRequests(accessRequests.filter(r => r.id !== id));
+      setConfirmAction(null);
+    } catch (error: any) {
+      console.error('Erro ao excluir:', error);
+      setDbError(error.message || 'Erro ao excluir solicitação.');
     } finally {
       setIsSubmitting(false);
     }
@@ -209,11 +224,13 @@ export default function App() {
         const [
           { data: transactionsData, error: tError },
           { data: goalsData, error: gError },
-          { data: investmentsData, error: iError }
+          { data: investmentsData, error: iError },
+          { data: profileData, error: pError }
         ] = await Promise.all([
           supabase.from('transactions').select('*').order('date', { ascending: false }),
           supabase.from('goals').select('*'),
-          supabase.from('investments').select('*')
+          supabase.from('investments').select('*'),
+          supabase.from('profiles').select('full_name').eq('id', session.user.id).single()
         ]);
 
         if (tError || gError || iError) {
@@ -224,6 +241,15 @@ export default function App() {
         if (transactionsData) setTransactions(transactionsData);
         if (goalsData) setGoals(goalsData);
         if (investmentsData) setInvestments(investmentsData);
+        
+        if (profileData) {
+          setUserName(profileData.full_name || '');
+          setIsEditingName(!profileData.full_name);
+        } else if (pError && pError.code !== 'PGRST116') {
+          console.error('Error fetching profile:', pError);
+        } else if (!profileData) {
+          setIsEditingName(true);
+        }
       } catch (err) {
         console.error('Unexpected error fetching data:', err);
       }
@@ -289,9 +315,23 @@ export default function App() {
     localStorage.setItem('finthery_investments', JSON.stringify(investments));
   }, [investments]);
 
-  useEffect(() => {
-    localStorage.setItem('finthery_user_name', userName);
-  }, [userName]);
+  const handleSaveName = async () => {
+    if (!userName || !session) return;
+    setIsSubmitting(true);
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .upsert({ id: session.user.id, full_name: userName, updated_at: new Date().toISOString() });
+      
+      if (error) throw error;
+      setIsEditingName(false);
+    } catch (error: any) {
+      console.error('Error saving name:', error);
+      setDbError('Erro ao salvar nome no perfil.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   const currentMonthTransactions = useMemo(() => {
     const start = startOfMonth(currentDate);
@@ -742,19 +782,22 @@ export default function App() {
                       type="text" 
                       value={userName}
                       onChange={e => setUserName(e.target.value)}
-                      onBlur={() => userName && setIsEditingName(false)}
-                      onKeyDown={e => e.key === 'Enter' && userName && setIsEditingName(false)}
+                      onKeyDown={e => e.key === 'Enter' && userName && handleSaveName()}
                       autoFocus
                       placeholder="Seu nome"
                       className="bg-zinc-900/50 backdrop-blur-sm border border-brand/50 rounded-lg px-3 py-1 text-[16px] font-bold focus:outline-none text-white"
                     />
-                    <button onClick={() => userName && setIsEditingName(false)} className="text-brand hover:scale-110 transition-transform">
-                      <Save size={20} />
+                    <button 
+                      onClick={handleSaveName} 
+                      disabled={isSubmitting}
+                      className="text-brand hover:scale-110 transition-transform disabled:opacity-50"
+                    >
+                      {isSubmitting ? <Loader2 className="animate-spin" size={20} /> : <Save size={20} />}
                     </button>
                   </div>
                 ) : (
                   <div className="flex items-center gap-2 group/name">
-                    <h2 className="text-white text-[16px] font-bold uppercase tracking-tight">Bem-vindo, <span className="text-brand font-black">{userName}</span></h2>
+                    <h2 className="text-white text-[16px] font-bold uppercase tracking-tight">Bem-vindo, <span className="text-brand font-black">{userName || 'Usuário'}</span></h2>
                     <button onClick={() => setIsEditingName(true)} className="text-zinc-400 hover:text-brand transition-colors opacity-0 group-hover/name:opacity-100">
                       <Pencil size={14} />
                     </button>
@@ -767,8 +810,9 @@ export default function App() {
             </div>
           </div>
           
-          <div className="flex items-center gap-3">
-            {isAdmin && (
+          <div className="flex flex-col md:flex-row items-center gap-4 w-full md:w-auto">
+            <div className="flex items-center gap-2">
+              {isAdmin && (
               <button 
                 onClick={() => setShowAdminPanel(true)}
                 className="bg-brand/10 hover:bg-brand/20 text-brand p-2 rounded-lg transition-all flex items-center gap-2 text-xs font-bold uppercase tracking-widest"
@@ -790,14 +834,15 @@ export default function App() {
                 <Plus size={18} /> Instalar Aplicativo
               </button>
             )}
-            <div className="flex items-center gap-4 bg-black/40 backdrop-blur-xl p-2.5 rounded-2xl border border-white/10 shadow-2xl">
+            </div>
+            <div className="flex items-center gap-4 bg-black/40 backdrop-blur-xl p-2.5 rounded-2xl border border-white/10 shadow-2xl w-full max-w-[320px] md:w-auto justify-between md:justify-center">
             <button 
               onClick={() => setCurrentDate(subMonths(currentDate, 1))}
               className="p-2.5 hover:bg-white/5 rounded-xl transition-all hover:scale-105 active:scale-95 text-zinc-400 hover:text-white"
             >
               <ChevronLeft size={24} />
             </button>
-            <div className="flex flex-col items-center gap-0 min-w-[160px] justify-center">
+              <div className="flex flex-col items-center gap-0 min-w-[140px] md:min-w-[160px] justify-center">
               <span className="text-[10px] uppercase tracking-[0.3em] text-brand font-black mb-0.5">Período Atual</span>
               <div className="flex items-center gap-2 font-bold text-white text-lg">
                 {format(currentDate, 'MMMM yyyy', { locale: ptBR })}
@@ -1305,7 +1350,20 @@ export default function App() {
               💡 Dica do Mês
             </h5>
             <p className="text-sm text-zinc-300 leading-relaxed italic">
-              "O controle financeiro não é sobre quanto você ganha, mas sobre como você gerencia o que tem."
+              {[
+                "O controle financeiro não é sobre quanto você ganha, mas sobre como você gerencia o que tem.",
+                "Pague-se primeiro: reserve uma parte do seu salário para investimentos antes de pagar as contas.",
+                "Pequenos gastos diários podem se tornar grandes rombos no orçamento mensal. Monitore o cafézinho!",
+                "Ter uma reserva de emergência é o primeiro passo para a liberdade financeira e paz de espírito.",
+                "Evite compras por impulso. Espere 24 horas antes de decidir se realmente precisa daquele item.",
+                "Diversificar seus investimentos é a melhor forma de proteger seu patrimônio a longo prazo.",
+                "O cartão de crédito é uma ferramenta, não uma extensão do seu salário. Use com sabedoria.",
+                "Defina metas claras para o seu dinheiro. Quem não sabe para onde vai, qualquer caminho serve.",
+                "Educação financeira é o melhor investimento que você pode fazer por si mesmo.",
+                "A inflação corrói seu poder de compra. Não deixe seu dinheiro parado na conta corrente.",
+                "Reveja suas assinaturas mensais. Muitas vezes pagamos por serviços que nem utilizamos.",
+                "O segredo da riqueza não é ganhar muito, mas gastar menos do que se ganha e investir a diferença."
+              ][currentDate.getMonth()]}
             </p>
           </div>
         </div>
@@ -1313,7 +1371,7 @@ export default function App() {
 
       <footer className="pb-12 pt-6 text-center opacity-30 hover:opacity-100 transition-opacity">
         <p className="text-zinc-500 text-[10px] font-bold uppercase tracking-[0.3em]">
-          By: Thays Vidal
+          By: Administração Thays Vidal
         </p>
       </footer>
 
@@ -1695,7 +1753,7 @@ export default function App() {
       {/* Admin Panel Modal */}
       {showAdminPanel && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-zinc-900 border border-zinc-800 w-full max-w-2xl rounded-3xl p-8 shadow-2xl max-h-[80vh] overflow-y-auto">
+          <div className="bg-zinc-900 border border-zinc-800 w-full max-w-2xl rounded-3xl p-8 shadow-2xl max-h-[80vh] overflow-y-auto relative">
             <div className="flex justify-between items-center mb-8">
               <h3 className="text-2xl font-black flex items-center gap-2 uppercase tracking-tighter">
                 <User className="text-brand" /> Painel Admin
@@ -1731,28 +1789,100 @@ export default function App() {
                       </span>
                     </div>
                     
-                    {req.status === 'pending' && (
-                      <div className="flex gap-2">
-                        <button 
-                          onClick={() => handleRejectRequest(req.id)}
-                          disabled={isSubmitting}
-                          className="bg-rose-500/10 hover:bg-rose-500 text-rose-500 hover:text-white p-2 rounded-xl transition-all"
-                        >
-                          <Minus size={18} />
-                        </button>
-                        <button 
-                          onClick={() => handleApproveRequest(req)}
-                          disabled={isSubmitting}
-                          className="bg-emerald-500/10 hover:bg-emerald-500 text-emerald-500 hover:text-white p-2 rounded-xl transition-all"
-                        >
-                          <Plus size={18} />
-                        </button>
-                      </div>
-                    )}
+                    <div className="flex gap-2">
+                      {req.status === 'pending' && (
+                        <>
+                          <button 
+                            onClick={() => setConfirmAction({ id: req.id, type: 'reject', email: req.email })}
+                            disabled={isSubmitting}
+                            className="bg-rose-500/10 hover:bg-rose-500 text-rose-500 hover:text-white p-2 rounded-xl transition-all"
+                            title="Rejeitar"
+                          >
+                            <Minus size={18} />
+                          </button>
+                          <button 
+                            onClick={() => setConfirmAction({ id: req.id, type: 'approve', email: req.email })}
+                            disabled={isSubmitting}
+                            className="bg-emerald-500/10 hover:bg-emerald-500 text-emerald-500 hover:text-white p-2 rounded-xl transition-all"
+                            title="Aprovar"
+                          >
+                            <Plus size={18} />
+                          </button>
+                        </>
+                      )}
+                      <button 
+                        onClick={() => setConfirmAction({ id: req.id, type: 'delete', email: req.email })}
+                        disabled={isSubmitting}
+                        className="bg-zinc-700/50 hover:bg-rose-500 text-zinc-400 hover:text-white p-2 rounded-xl transition-all"
+                        title="Excluir"
+                      >
+                        <Trash2 size={18} />
+                      </button>
+                    </div>
                   </div>
                 ))
               )}
             </div>
+
+            {/* Confirmation Dialog */}
+            <AnimatePresence>
+              {confirmAction && (
+                <motion.div 
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="absolute inset-0 bg-black/90 backdrop-blur-md flex items-center justify-center p-8 z-[60] rounded-3xl"
+                >
+                  <motion.div 
+                    initial={{ scale: 0.9, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    exit={{ scale: 0.9, opacity: 0 }}
+                    className="text-center space-y-6 max-w-sm"
+                  >
+                    <div className={cn(
+                      "w-16 h-16 mx-auto rounded-full flex items-center justify-center",
+                      confirmAction.type === 'approve' ? "bg-emerald-500/20 text-emerald-500" : "bg-rose-500/20 text-rose-500"
+                    )}>
+                      {confirmAction.type === 'approve' ? <Plus size={32} /> : confirmAction.type === 'reject' ? <Minus size={32} /> : <Trash2 size={32} />}
+                    </div>
+                    
+                    <div>
+                      <h4 className="text-xl font-black uppercase tracking-tighter">
+                        {confirmAction.type === 'approve' ? 'Confirmar Aprovação' : confirmAction.type === 'reject' ? 'Confirmar Rejeição' : 'Confirmar Exclusão'}
+                      </h4>
+                      <p className="text-zinc-400 text-sm mt-2">
+                        Deseja realmente {confirmAction.type === 'approve' ? 'aprovar' : confirmAction.type === 'reject' ? 'rejeitar' : 'excluir'} o acesso para:
+                        <br />
+                        <span className="text-white font-bold">{confirmAction.email}</span>?
+                      </p>
+                    </div>
+
+                    <div className="flex gap-3">
+                      <button 
+                        onClick={() => setConfirmAction(null)}
+                        className="flex-1 bg-zinc-800 hover:bg-zinc-700 py-3 rounded-xl font-bold transition-colors uppercase tracking-widest text-xs"
+                      >
+                        Cancelar
+                      </button>
+                      <button 
+                        onClick={() => {
+                          if (confirmAction.type === 'approve') handleApproveRequest(confirmAction);
+                          else if (confirmAction.type === 'reject') handleRejectRequest(confirmAction.id);
+                          else if (confirmAction.type === 'delete') handleDeleteRequest(confirmAction.id);
+                        }}
+                        disabled={isSubmitting}
+                        className={cn(
+                          "flex-1 py-3 rounded-xl font-black transition-colors uppercase tracking-widest text-xs flex items-center justify-center gap-2",
+                          confirmAction.type === 'approve' ? "bg-emerald-600 hover:bg-emerald-500" : "bg-rose-600 hover:bg-rose-500"
+                        )}
+                      >
+                        {isSubmitting ? <Loader2 className="animate-spin" size={16} /> : 'Confirmar'}
+                      </button>
+                    </div>
+                  </motion.div>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
         </div>
       )}
