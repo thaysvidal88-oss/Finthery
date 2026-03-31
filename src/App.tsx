@@ -63,6 +63,69 @@ const CARD_COLORS = [
   { name: 'Brand', value: 'from-brand-dark to-brand' },
 ];
 
+const Logo = ({ size = 'md', showText = true, className }: { size?: 'sm' | 'md' | 'lg', showText?: boolean, className?: string }) => {
+  const textSize = size === 'sm' ? 'text-sm' : size === 'md' ? 'text-5xl md:text-6xl' : 'text-8xl';
+  
+  // Planet body dimensions
+  const planetDim = size === 'sm' ? 'w-6 h-6' : size === 'md' ? 'w-14 h-14' : 'w-20 h-20';
+  
+  // Ring dimensions (proportional to planet)
+  const ringW = size === 'sm' ? 44 : size === 'md' ? 100 : 140;
+  const ringH = size === 'sm' ? 12 : size === 'md' ? 28 : 40;
+
+  return (
+    <div className={cn("flex items-center gap-6", className)}>
+      <div className={cn("relative flex items-center justify-center", planetDim)}>
+        
+        {/* Layer 1: Back Rings (Behind Planet) */}
+        <div className="absolute z-0 pointer-events-none flex items-center justify-center" style={{ width: ringW, height: ringH }}>
+          <div 
+            className="w-full h-full border border-purple-400/30 rounded-[100%] rotate-[-25deg] skew-x-[65deg]"
+            style={{ clipPath: 'inset(0 0 50% 0)' }}
+          />
+        </div>
+
+        {/* Layer 2: Planet Body */}
+        <div className="absolute inset-0 rounded-full bg-[#05000a] shadow-[inset_-4px_-4px_10px_rgba(0,0,0,0.9),0_0_30px_rgba(168,85,247,0.3)] border border-purple-500/10 overflow-hidden z-10">
+          {/* Intense Crescent Glow */}
+          <div className="absolute inset-0 opacity-80 bg-[radial-gradient(circle_at_25%_35%,#d8b4fe,transparent_60%)]" />
+          <div className="absolute inset-0 opacity-40 bg-[radial-gradient(circle_at_25%_35%,#a855f7,transparent_80%)]" />
+          
+          {/* Atmospheric Rim Light */}
+          <div className="absolute inset-0 rounded-full border-t border-l border-white/20 blur-[0.5px]" />
+        </div>
+
+        {/* Layer 3: Front Rings (In front of Planet) */}
+        <div className="absolute z-20 pointer-events-none flex items-center justify-center" style={{ width: ringW, height: ringH }}>
+          <div 
+            className="w-full h-full border-2 border-purple-300/50 rounded-[100%] rotate-[-25deg] skew-x-[65deg] shadow-[0_0_10px_rgba(192,132,252,0.4)]"
+            style={{ clipPath: 'inset(50% 0 0 0)' }}
+          />
+        </div>
+        
+        {/* Layer 4: Arrow - Smaller and more opaque/muted */}
+        <div className="relative z-30 flex items-center justify-center">
+          <TrendingUp 
+            size={size === 'sm' ? 10 : size === 'md' ? 24 : 36} 
+            className="text-white/60 drop-shadow-[0_0_10px_rgba(192,132,252,0.4)] rotate-[-10deg]" 
+            strokeWidth={2.5}
+          />
+        </div>
+
+        {/* Sparkles */}
+        <div className="absolute -top-4 -left-4 w-1 h-1 bg-white rounded-full animate-pulse shadow-[0_0_8px_white]" />
+        <div className="absolute top-2 -right-6 w-1 h-1 bg-purple-200 rounded-full animate-pulse delay-150 shadow-[0_0_10px_rgba(192,132,252,1)]" />
+      </div>
+
+      {showText && (
+        <h1 className={cn("font-medium tracking-tight text-white drop-shadow-2xl font-jersey", textSize)}>
+          Finthery
+        </h1>
+      )}
+    </div>
+  );
+};
+
 export default function App() {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
@@ -243,12 +306,17 @@ export default function App() {
         if (investmentsData) setInvestments(investmentsData);
         
         if (profileData) {
-          setUserName(profileData.full_name || '');
-          setIsEditingName(!profileData.full_name);
+          setUserName(profileData.full_name || session.user.user_metadata?.full_name || '');
+          setIsEditingName(!profileData.full_name && !session.user.user_metadata?.full_name);
         } else if (pError && pError.code !== 'PGRST116') {
           console.error('Error fetching profile:', pError);
+          const metadataName = session.user.user_metadata?.full_name || '';
+          setUserName(metadataName);
+          setIsEditingName(!metadataName);
         } else if (!profileData) {
-          setIsEditingName(true);
+          const metadataName = session.user.user_metadata?.full_name || '';
+          setUserName(metadataName);
+          setIsEditingName(!metadataName);
         }
       } catch (err) {
         console.error('Unexpected error fetching data:', err);
@@ -319,11 +387,25 @@ export default function App() {
     if (!userName || !session) return;
     setIsSubmitting(true);
     try {
-      const { error } = await supabase
-        .from('profiles')
-        .upsert({ id: session.user.id, full_name: userName, updated_at: new Date().toISOString() });
+      // 1. Atualizar metadados do usuário (mais confiável)
+      const { error: metadataError } = await supabase.auth.updateUser({
+        data: { full_name: userName }
+      });
+      if (metadataError) throw metadataError;
+
+      // 2. Tentar atualizar a tabela profiles (opcional, mas bom para consistência)
+      try {
+        const { error } = await supabase
+          .from('profiles')
+          .upsert({ id: session.user.id, full_name: userName, updated_at: new Date().toISOString() });
+        
+        if (error) {
+          console.warn('Erro ao salvar na tabela profiles, mas metadados foram atualizados:', error);
+        }
+      } catch (e) {
+        console.warn('Exceção ao salvar na tabela profiles:', e);
+      }
       
-      if (error) throw error;
       setIsEditingName(false);
     } catch (error: any) {
       console.error('Error saving name:', error);
@@ -697,23 +779,55 @@ export default function App() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-black flex items-center justify-center">
-        <Loader2 className="animate-spin text-brand" size={48} />
+      <div className="min-h-screen bg-gradient-to-br from-[#1a0b1a] via-[#0f050f] to-black flex items-center justify-center relative overflow-hidden">
+        <div className="absolute inset-0 pointer-events-none">
+          {[...Array(80)].map((_, i) => (
+            <div 
+              key={i}
+              className="absolute rounded-full bg-white opacity-10 animate-pulse"
+              style={{
+                top: `${Math.random() * 100}%`,
+                left: `${Math.random() * 100}%`,
+                width: `${1 + Math.random() * 2}px`,
+                height: `${1 + Math.random() * 2}px`,
+                animationDelay: `${Math.random() * 5}s`,
+                animationDuration: `${3 + Math.random() * 4}s`
+              }}
+            />
+          ))}
+        </div>
+        <Loader2 className="animate-spin text-brand relative z-10" size={48} />
       </div>
     );
   }
 
   if (!supabase) {
     return (
-      <div className="min-h-screen bg-black flex items-center justify-center p-4">
-        <div className="max-w-md w-full bg-zinc-900 border border-zinc-800 rounded-3xl p-8 text-center">
+      <div className="min-h-screen bg-gradient-to-br from-[#1a0b1a] via-[#0f050f] to-black flex items-center justify-center p-4 relative overflow-hidden">
+        <div className="absolute inset-0 pointer-events-none">
+          {[...Array(80)].map((_, i) => (
+            <div 
+              key={i}
+              className="absolute rounded-full bg-white opacity-10 animate-pulse"
+              style={{
+                top: `${Math.random() * 100}%`,
+                left: `${Math.random() * 100}%`,
+                width: `${1 + Math.random() * 2}px`,
+                height: `${1 + Math.random() * 2}px`,
+                animationDelay: `${Math.random() * 5}s`,
+                animationDuration: `${3 + Math.random() * 4}s`
+              }}
+            />
+          ))}
+        </div>
+        <div className="max-w-md w-full bg-zinc-900/40 backdrop-blur-xl border border-white/10 rounded-3xl p-8 text-center relative z-10">
           <AlertCircle className="mx-auto text-rose-500 mb-4" size={48} />
           <h2 className="text-2xl font-bold text-white mb-2">Configuração Necessária</h2>
           <p className="text-zinc-400 mb-6">
             As variáveis de ambiente do Supabase não foram encontradas. 
             Por favor, configure <strong>VITE_SUPABASE_URL</strong> e <strong>VITE_SUPABASE_ANON_KEY</strong> nos Segredos do projeto.
           </p>
-          <div className="bg-zinc-800 p-4 rounded-xl text-left text-xs font-mono text-zinc-300 overflow-x-auto">
+          <div className="bg-black/40 p-4 rounded-xl text-left text-xs font-mono text-zinc-300 overflow-x-auto border border-white/5">
             VITE_SUPABASE_URL=sua-url<br />
             VITE_SUPABASE_ANON_KEY=sua-chave
           </div>
@@ -732,7 +846,28 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-black text-white font-sans relative overflow-x-hidden scrollbar-custom">
+    <div className="min-h-screen bg-gradient-to-br from-[#1a0b1a] via-[#0f050f] to-black text-white font-sans relative overflow-x-hidden scrollbar-custom">
+      {/* Galaxy Sparkles Background */}
+      <div className="fixed inset-0 pointer-events-none z-0">
+        {[...Array(150)].map((_, i) => (
+          <div 
+            key={i}
+            className="absolute rounded-full bg-white opacity-10 animate-pulse"
+            style={{
+              top: `${Math.random() * 100}%`,
+              left: `${Math.random() * 100}%`,
+              width: `${1 + Math.random() * 2}px`,
+              height: `${1 + Math.random() * 2}px`,
+              animationDelay: `${Math.random() * 5}s`,
+              animationDuration: `${3 + Math.random() * 4}s`,
+              boxShadow: Math.random() > 0.9 ? '0 0 10px 1px rgba(192, 132, 252, 0.4)' : 'none'
+            }}
+          />
+        ))}
+        <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-brand/5 rounded-full blur-[120px] animate-pulse" />
+        <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-purple-500/5 rounded-full blur-[120px] animate-pulse" />
+      </div>
+
       {dbError && (
         <div className="fixed bottom-4 right-4 z-[100] bg-rose-500 text-white px-6 py-3 rounded-xl shadow-2xl flex items-center gap-3 animate-in fade-in slide-in-from-bottom-4">
           <AlertCircle size={20} />
@@ -747,37 +882,15 @@ export default function App() {
       )}
       {/* Header with Gradient */}
       {/* Header Section with Galaxy Effect */}
-      <div className="relative overflow-hidden bg-gradient-to-br from-[#1a0b1a] via-[#0f050f] to-black pt-12 pb-20 px-4 md:px-8 border-b border-zinc-800/50 z-10">
-        {/* Galaxy Sparkles */}
-        <div className="absolute inset-0 pointer-events-none">
-          {[...Array(40)].map((_, i) => (
-            <div 
-              key={i}
-              className="absolute rounded-full bg-white opacity-20 animate-pulse"
-              style={{
-                top: `${Math.random() * 100}%`,
-                left: `${Math.random() * 100}%`,
-                width: `${Math.random() * 3}px`,
-                height: `${Math.random() * 3}px`,
-                animationDelay: `${Math.random() * 5}s`,
-                animationDuration: `${2 + Math.random() * 4}s`,
-                boxShadow: Math.random() > 0.8 ? '0 0 10px 2px rgba(219, 39, 119, 0.4)' : 'none'
-              }}
-            />
-          ))}
-          <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-brand/10 rounded-full blur-[120px] animate-pulse" />
-          <div className="absolute bottom-[-10%] right-[-10%] w-[30%] h-[30%] bg-purple-900/20 rounded-full blur-[100px]" />
-        </div>
-
+      <div className="relative overflow-hidden pt-12 pb-20 px-4 md:px-8 border-b border-zinc-800/50 z-10">
         <header className="max-w-6xl mx-auto flex flex-col md:flex-row justify-between items-center gap-8 relative z-20">
-          <div className="flex items-center gap-5">
-            <div className="w-12 h-12 bg-white/10 backdrop-blur-md border border-white/20 rounded-xl flex items-center justify-center shadow-xl">
-              <User size={24} className="text-white" />
-            </div>
-            <div>
+          <div className="flex flex-col md:flex-row items-center gap-8">
+            <Logo size="md" />
+            <div className="h-px w-12 md:h-12 md:w-px bg-white/10 hidden md:block" />
+            <div className="flex flex-col items-center md:items-start gap-1">
               <div className="flex items-center gap-2">
                 {isEditingName ? (
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 bg-black/40 backdrop-blur-md p-1 rounded-xl border border-white/10">
                     <input 
                       type="text" 
                       value={userName}
@@ -785,28 +898,27 @@ export default function App() {
                       onKeyDown={e => e.key === 'Enter' && userName && handleSaveName()}
                       autoFocus
                       placeholder="Seu nome"
-                      className="bg-zinc-900/50 backdrop-blur-sm border border-brand/50 rounded-lg px-3 py-1 text-[16px] font-bold focus:outline-none text-white"
+                      className="bg-transparent px-3 py-1 text-[16px] font-bold focus:outline-none text-white w-40"
                     />
                     <button 
                       onClick={handleSaveName} 
                       disabled={isSubmitting}
-                      className="text-brand hover:scale-110 transition-transform disabled:opacity-50"
+                      className="bg-brand text-white p-1.5 rounded-lg hover:scale-110 transition-transform disabled:opacity-50"
                     >
-                      {isSubmitting ? <Loader2 className="animate-spin" size={20} /> : <Save size={20} />}
+                      {isSubmitting ? <Loader2 className="animate-spin" size={16} /> : <Save size={16} />}
                     </button>
                   </div>
                 ) : (
-                  <div className="flex items-center gap-2 group/name">
-                    <h2 className="text-white text-[16px] font-bold uppercase tracking-tight">Bem-vindo, <span className="text-brand font-black">{userName || 'Usuário'}</span></h2>
-                    <button onClick={() => setIsEditingName(true)} className="text-zinc-400 hover:text-brand transition-colors opacity-0 group-hover/name:opacity-100">
-                      <Pencil size={14} />
+                  <div className="flex items-center gap-2 group/name bg-black/20 backdrop-blur-sm px-4 py-1.5 rounded-full border border-white/5">
+                    <h2 className="text-zinc-400 text-[12px] font-bold uppercase tracking-widest">
+                      Bem-vindo, <span className="text-white font-black">{userName || 'Usuário'}</span>
+                    </h2>
+                    <button onClick={() => setIsEditingName(true)} className="text-zinc-500 hover:text-brand transition-colors opacity-0 group-hover/name:opacity-100">
+                      <Pencil size={12} />
                     </button>
                   </div>
                 )}
               </div>
-              <h1 className="text-6xl font-light tracking-tighter text-white drop-shadow-2xl font-jersey">
-                Finthery
-              </h1>
             </div>
           </div>
           
@@ -1070,7 +1182,7 @@ export default function App() {
               <h4 className="text-lg font-bold mb-4 flex items-center gap-2">
                 <BarChartIcon size={20} className="text-brand" /> Balanço
               </h4>
-              <div className="h-[250px] w-full">
+              <div className="h-[250px] w-full bg-zinc-900 rounded-2xl">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={[{ name: 'Balanço', ganhos: totals.income, gastos: totals.expense }]}>
                     <XAxis dataKey="name" stroke="#52525b" />
@@ -1078,6 +1190,7 @@ export default function App() {
                     <Tooltip 
                       contentStyle={{ backgroundColor: '#18181b', border: '1px solid #27272a', borderRadius: '12px' }}
                       itemStyle={{ color: '#fff' }}
+                      cursor={{ fill: 'rgba(255, 255, 255, 0.05)' }}
                       formatter={(value: number) => formatCurrency(value)}
                     />
                     <Bar dataKey="ganhos" fill="#10b981" radius={[4, 4, 0, 0]} />
@@ -1369,9 +1482,10 @@ export default function App() {
         </div>
       </main>
 
-      <footer className="pb-12 pt-6 text-center opacity-30 hover:opacity-100 transition-opacity">
+      <footer className="pb-12 pt-12 flex items-center justify-center gap-3 opacity-30 hover:opacity-100 transition-opacity">
+        <Logo size="sm" showText={false} />
         <p className="text-zinc-500 text-[10px] font-bold uppercase tracking-[0.3em]">
-          By: Administração Thays Vidal
+          BY THAYS VIDAL
         </p>
       </footer>
 
