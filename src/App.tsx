@@ -18,8 +18,12 @@ import {
   Edit2,
   Save,
   Pencil,
-  Loader2
+  Loader2,
+  Check,
+  Sun,
+  Moon
 } from 'lucide-react';
+import { Toaster, toast } from 'sonner';
 import { 
   PieChart, 
   Pie, 
@@ -63,7 +67,7 @@ const CARD_COLORS = [
   { name: 'Brand', value: 'from-brand-dark to-brand' },
 ];
 
-const Logo = ({ size = 'md', showText = true, className }: { size?: 'sm' | 'md' | 'lg', showText?: boolean, className?: string }) => {
+const Logo = ({ size = 'md', showText = true, className, theme = 'dark' }: { size?: 'sm' | 'md' | 'lg', showText?: boolean, className?: string, theme?: 'light' | 'dark' }) => {
   const textSize = size === 'sm' ? 'text-sm' : size === 'md' ? 'text-5xl md:text-6xl' : 'text-8xl';
   
   // Planet body dimensions
@@ -80,51 +84,99 @@ const Logo = ({ size = 'md', showText = true, className }: { size?: 'sm' | 'md' 
         {/* Layer 1: Back Rings (Behind Planet) */}
         <div className="absolute z-0 pointer-events-none flex items-center justify-center" style={{ width: ringW, height: ringH }}>
           <div 
-            className="w-full h-full border border-purple-400/30 rounded-[100%] rotate-[-25deg] skew-x-[65deg]"
+            className={cn(
+              "w-full h-full border rounded-[100%] rotate-[-25deg] skew-x-[65deg]",
+              theme === 'dark' ? "border-purple-400/30" : "border-brand/40"
+            )}
             style={{ clipPath: 'inset(0 0 50% 0)' }}
           />
         </div>
 
         {/* Layer 2: Planet Body */}
-        <div className="absolute inset-0 rounded-full bg-[#05000a] shadow-[inset_-4px_-4px_10px_rgba(0,0,0,0.9),0_0_30px_rgba(168,85,247,0.3)] border border-purple-500/10 overflow-hidden z-10">
+        <div className={cn(
+          "absolute inset-0 rounded-full overflow-hidden z-10 border",
+          theme === 'dark' 
+            ? "bg-[#05000a] shadow-[inset_-4px_-4px_10px_rgba(0,0,0,0.9),0_0_30px_rgba(168,85,247,0.3)] border-purple-500/10" 
+            : "bg-white shadow-[inset_-4px_-4px_10px_rgba(0,0,0,0.1),0_0_20px_rgba(202,148,201,0.2)] border-brand/20"
+        )}>
           {/* Intense Crescent Glow */}
-          <div className="absolute inset-0 opacity-80 bg-[radial-gradient(circle_at_25%_35%,#d8b4fe,transparent_60%)]" />
-          <div className="absolute inset-0 opacity-40 bg-[radial-gradient(circle_at_25%_35%,#a855f7,transparent_80%)]" />
+          <div className={cn(
+            "absolute inset-0 opacity-80",
+            theme === 'dark' ? "bg-[radial-gradient(circle_at_25%_35%,#d8b4fe,transparent_60%)]" : "bg-[radial-gradient(circle_at_25%_35%,#E2B8E1,transparent_60%)]"
+          )} />
+          <div className={cn(
+            "absolute inset-0 opacity-40",
+            theme === 'dark' ? "bg-[radial-gradient(circle_at_25%_35%,#a855f7,transparent_80%)]" : "bg-[radial-gradient(circle_at_25%_35%,#CA94C9,transparent_80%)]"
+          )} />
           
           {/* Atmospheric Rim Light */}
-          <div className="absolute inset-0 rounded-full border-t border-l border-white/20 blur-[0.5px]" />
+          <div className={cn(
+            "absolute inset-0 rounded-full border-t border-l blur-[0.5px]",
+            theme === 'dark' ? "border-white/20" : "border-brand/40"
+          )} />
         </div>
 
         {/* Layer 3: Front Rings (In front of Planet) */}
         <div className="absolute z-20 pointer-events-none flex items-center justify-center" style={{ width: ringW, height: ringH }}>
           <div 
-            className="w-full h-full border-2 border-purple-300/50 rounded-[100%] rotate-[-25deg] skew-x-[65deg] shadow-[0_0_10px_rgba(192,132,252,0.4)]"
+            className={cn(
+              "w-full h-full border-2 rounded-[100%] rotate-[-25deg] skew-x-[65deg]",
+              theme === 'dark' ? "border-purple-300/50 shadow-[0_0_10px_rgba(192,132,252,0.4)]" : "border-brand/60 shadow-[0_0_10px_rgba(202,148,201,0.3)]"
+            )}
             style={{ clipPath: 'inset(50% 0 0 0)' }}
           />
         </div>
         
-        {/* Layer 4: Arrow - Smaller and more opaque/muted */}
+        {/* Layer 4: Arrow */}
         <div className="relative z-30 flex items-center justify-center">
           <TrendingUp 
             size={size === 'sm' ? 10 : size === 'md' ? 24 : 36} 
-            className="text-white/60 drop-shadow-[0_0_10px_rgba(192,132,252,0.4)] rotate-[-10deg]" 
+            className={cn(
+              "rotate-[-10deg]",
+              theme === 'dark' ? "text-white/60 drop-shadow-[0_0_10px_rgba(192,132,252,0.4)]" : "text-brand drop-shadow-[0_0_5px_rgba(202,148,201,0.4)]"
+            )}
             strokeWidth={2.5}
           />
         </div>
 
         {/* Sparkles */}
-        <div className="absolute -top-4 -left-4 w-1 h-1 bg-white rounded-full animate-pulse shadow-[0_0_8px_white]" />
-        <div className="absolute top-2 -right-6 w-1 h-1 bg-purple-200 rounded-full animate-pulse delay-150 shadow-[0_0_10px_rgba(192,132,252,1)]" />
+        <div className={cn(
+          "absolute -top-4 -left-4 w-1 h-1 rounded-full animate-pulse",
+          theme === 'dark' ? "bg-white shadow-[0_0_8px_white]" : "bg-brand shadow-[0_0_8px_rgba(202,148,201,0.8)]"
+        )} />
+        <div className={cn(
+          "absolute top-2 -right-6 w-1 h-1 rounded-full animate-pulse delay-150",
+          theme === 'dark' ? "bg-purple-200 shadow-[0_0_10px_rgba(192,132,252,1)]" : "bg-brand-light shadow-[0_0_10px_rgba(202,148,201,0.6)]"
+        )} />
       </div>
 
       {showText && (
-        <h1 className={cn("font-medium tracking-tight text-white drop-shadow-2xl font-jersey", textSize)}>
+        <h1 className={cn(
+          "font-medium tracking-tight drop-shadow-2xl font-jersey", 
+          textSize,
+          theme === 'dark' ? "text-white" : "text-zinc-900"
+        )}>
           Finthery
         </h1>
       )}
     </div>
   );
 };
+
+const SuccessToast = ({ message, theme = 'dark' }: { message: string, theme?: 'light' | 'dark' }) => (
+  <div className={cn(
+    "flex items-center gap-3 border p-3 rounded-2xl shadow-2xl",
+    theme === 'dark' ? "bg-zinc-900 border-brand/30" : "bg-white border-brand/20"
+  )}>
+    <div className="bg-brand/10 p-2 rounded-xl">
+      <Logo size="sm" showText={false} theme={theme} />
+    </div>
+    <div className="flex flex-col">
+      <span className={cn("font-bold text-sm", theme === 'dark' ? "text-white" : "text-zinc-900")}>{message}</span>
+      <span className="text-zinc-500 text-[10px] uppercase tracking-widest">Sucesso</span>
+    </div>
+  </div>
+);
 
 export default function App() {
   const [session, setSession] = useState<Session | null>(null);
@@ -143,7 +195,25 @@ export default function App() {
   const [showAdminPanel, setShowAdminPanel] = useState(false);
   const [accessRequests, setAccessRequests] = useState<any[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isSuccess, setIsSuccess] = useState(false);
+  const [theme, setTheme] = useState<'light' | 'dark'>(() => {
+    const saved = localStorage.getItem('finthery_theme');
+    return (saved as 'light' | 'dark') || 'dark';
+  });
   const [confirmAction, setConfirmAction] = useState<{ id: string, type: 'approve' | 'reject' | 'delete', email?: string } | null>(null);
+
+  useEffect(() => {
+    localStorage.setItem('finthery_theme', theme);
+    if (theme === 'dark') {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  }, [theme]);
+
+  const toggleTheme = () => {
+    setTheme(prev => prev === 'light' ? 'dark' : 'light');
+  };
 
   const isAdmin = session?.user.email === 'thays.desktop@gmail.com';
 
@@ -184,7 +254,13 @@ export default function App() {
       if (updateError) throw updateError;
 
       setAccessRequests(accessRequests.map(r => r.id === request.id ? { ...r, status: 'approved' } : r));
-      setConfirmAction(null);
+      setIsSuccess(true);
+      toast.custom(() => <SuccessToast message="Solicitação aprovada!" theme={theme} />);
+      
+      setTimeout(() => {
+        setIsSuccess(false);
+        setConfirmAction(null);
+      }, 1500);
     } catch (error: any) {
       console.error('Erro ao aprovar:', error);
       setDbError(error.message || 'Erro ao aprovar solicitação.');
@@ -205,7 +281,13 @@ export default function App() {
       if (error) throw error;
 
       setAccessRequests(accessRequests.map(r => r.id === id ? { ...r, status: 'rejected' } : r));
-      setConfirmAction(null);
+      setIsSuccess(true);
+      toast.custom(() => <SuccessToast message="Solicitação rejeitada!" theme={theme} />);
+      
+      setTimeout(() => {
+        setIsSuccess(false);
+        setConfirmAction(null);
+      }, 1500);
     } catch (error: any) {
       console.error('Erro ao rejeitar:', error);
       setDbError(error.message || 'Erro ao rejeitar solicitação.');
@@ -226,7 +308,13 @@ export default function App() {
       if (error) throw error;
 
       setAccessRequests(accessRequests.filter(r => r.id !== id));
-      setConfirmAction(null);
+      setIsSuccess(true);
+      toast.custom(() => <SuccessToast message="Solicitação excluída!" theme={theme} />);
+      
+      setTimeout(() => {
+        setIsSuccess(false);
+        setConfirmAction(null);
+      }, 1500);
     } catch (error: any) {
       console.error('Erro ao excluir:', error);
       setDbError(error.message || 'Erro ao excluir solicitação.');
@@ -406,7 +494,13 @@ export default function App() {
         console.warn('Exceção ao salvar na tabela profiles:', e);
       }
       
-      setIsEditingName(false);
+      setIsSuccess(true);
+      toast.custom(() => <SuccessToast message="Perfil atualizado!" theme={theme} />);
+      
+      setTimeout(() => {
+        setIsSuccess(false);
+        setIsEditingName(false);
+      }, 1500);
     } catch (error: any) {
       console.error('Error saving name:', error);
       setDbError('Erro ao salvar nome no perfil.');
@@ -447,21 +541,21 @@ export default function App() {
   }, [investments, currentDate]);
 
   const debtTotal = useMemo(() => {
-    const today = startOfDay(new Date());
-    const currentYear = today.getFullYear();
+    const refDate = startOfMonth(currentDate);
+    const refYear = currentDate.getFullYear();
     
     switch (debtView) {
       case 'future':
         return transactions
-          .filter(t => t.type === 'expense' && !isBefore(parseISO(t.date), today))
+          .filter(t => t.type === 'expense' && !isBefore(parseISO(t.date), refDate))
           .reduce((sum, t) => sum + t.amount, 0);
       case 'annual':
         return transactions
-          .filter(t => t.type === 'expense' && parseISO(t.date).getFullYear() === currentYear)
+          .filter(t => t.type === 'expense' && parseISO(t.date).getFullYear() === refYear)
           .reduce((sum, t) => sum + t.amount, 0);
       case 'installments':
         return transactions
-          .filter(t => t.type === 'expense' && t.installments && !isBefore(parseISO(t.date), today))
+          .filter(t => t.type === 'expense' && t.installments && !isBefore(parseISO(t.date), refDate))
           .reduce((sum, t) => sum + t.amount, 0);
       case 'all':
       default:
@@ -469,7 +563,7 @@ export default function App() {
           .filter(t => t.type === 'expense')
           .reduce((sum, t) => sum + t.amount, 0);
     }
-  }, [transactions, debtView]);
+  }, [transactions, debtView, currentDate]);
 
   const cardTotals = useMemo(() => {
     const totals: Record<string, { total: number, color: string }> = {};
@@ -568,9 +662,15 @@ export default function App() {
         setTransactions([...transactions, ...newTransactions]);
       }
 
-      setShowAddModal(false);
-      setEditingTransactionId(null);
-      resetForm();
+      setIsSuccess(true);
+      toast.custom(() => <SuccessToast message={editingTransactionId ? "Transação atualizada!" : "Transação salva com sucesso!"} theme={theme} />);
+      
+      setTimeout(() => {
+        setIsSuccess(false);
+        setShowAddModal(false);
+        setEditingTransactionId(null);
+        resetForm();
+      }, 1500);
     } catch (error: any) {
       console.error('Error in handleAddTransaction:', error);
       setDbError(error.message || 'Erro ao processar transação.');
@@ -647,12 +747,19 @@ export default function App() {
       }
 
       setGoals([...goals, newGoal]);
-      setShowGoalModal(false);
-      setGoalTitle('');
-      setGoalAmount('');
-      setGoalCurrentAmount('');
-      setGoalDeadline('');
-      setGoalColor('#CA94C9');
+      
+      setIsSuccess(true);
+      toast.custom(() => <SuccessToast message="Meta criada com sucesso!" theme={theme} />);
+
+      setTimeout(() => {
+        setIsSuccess(false);
+        setShowGoalModal(false);
+        setGoalTitle('');
+        setGoalAmount('');
+        setGoalCurrentAmount('');
+        setGoalDeadline('');
+        setGoalColor('#CA94C9');
+      }, 1500);
     } catch (error: any) {
       console.error('Error saving goal:', error);
       setDbError(error.message || 'Erro ao salvar meta.');
@@ -740,13 +847,19 @@ export default function App() {
         setInvestments([...investments, newInvestment]);
       }
 
-      setShowInvestmentModal(false);
-      setInvestmentDescription('');
-      setInvestmentAmount('');
-      setInvestmentTargetAmount('');
-      setInvestmentDate(format(new Date(), 'yyyy-MM-dd'));
-      setInvestmentColor('#CA94C9');
-      setEditingInvestmentId(null);
+      setIsSuccess(true);
+      toast.custom(() => <SuccessToast message={editingInvestmentId ? "Investimento atualizado!" : "Investimento salvo com sucesso!"} theme={theme} />);
+
+      setTimeout(() => {
+        setIsSuccess(false);
+        setShowInvestmentModal(false);
+        setInvestmentDescription('');
+        setInvestmentAmount('');
+        setInvestmentTargetAmount('');
+        setInvestmentDate(format(new Date(), 'yyyy-MM-dd'));
+        setInvestmentColor('#CA94C9');
+        setEditingInvestmentId(null);
+      }, 1500);
     } catch (error: any) {
       console.error('Error in handleInvestmentSubmit:', error);
       setDbError(error.message || 'Erro ao processar investimento.');
@@ -841,31 +954,70 @@ export default function App() {
       <Auth 
         isInitialResetMode={isResettingPassword}
         onPasswordResetComplete={() => setIsResettingPassword(false)} 
+        theme={theme}
       />
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#1a0b1a] via-[#0f050f] to-black text-white font-sans relative overflow-x-hidden scrollbar-custom">
-      {/* Galaxy Sparkles Background */}
+    <div className={cn(
+      "min-h-screen font-sans relative overflow-x-hidden scrollbar-custom transition-colors duration-500",
+      theme === 'dark' 
+        ? "bg-gradient-to-br from-[#1a0b1a] via-[#0f050f] to-black text-white" 
+        : "bg-[#f4f4f5] text-zinc-900"
+    )}>
+      <Toaster position="top-center" richColors theme={theme} />
+      {/* Galaxy Sparkles Background - Only in Dark Mode or subtle in Light */}
       <div className="fixed inset-0 pointer-events-none z-0">
+        {theme === 'light' && (
+          <>
+            {/* Wave Texture Effect */}
+            <div 
+              className="absolute inset-0 opacity-[0.08]" 
+              style={{ 
+                backgroundImage: `
+                  radial-gradient(circle at 20% 30%, #CA94C9 0%, transparent 40%),
+                  radial-gradient(circle at 80% 70%, #d8b4fe 0%, transparent 40%),
+                  radial-gradient(circle at 50% 50%, #e4e4e7 0%, transparent 60%)
+                `,
+                filter: 'blur(60px)'
+              }} 
+            />
+            <div 
+              className="absolute inset-0 opacity-[0.04]" 
+              style={{ 
+                backgroundImage: `url("data:image/svg+xml,%3Csvg width='100' height='20' viewBox='0 0 100 20' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M21.184 20c.357-.13.72-.264 1.088-.402l1.768-.661C33.64 15.347 39.647 14 50 14c10.271 0 15.362 1.222 24.629 4.928.955.383 1.869.74 2.75 1.072h6.225c-2.51-.73-5.139-1.691-8.233-2.928C65.888 13.278 60.562 12 50 12c-10.526 0-16.213 1.24-25.725 4.842-3.46 1.304-6.36 2.403-8.775 3.158h5.684zm4.732 0c-.099-.044-.199-.088-.299-.133l-1.55-.705C14.754 15.197 9.26 14 0 14c-4.426 0-7.71.271-10.474.667h5.39c2.2-.156 4.725-.267 7.418-.267 8.134 0 13.607 1.037 22.165 4.913l1.417.623h0c.1.045.2.09.3.134h4.732zm-15.916 0c.074-.015.15-.03.225-.044l.77-.146C16.485 18.819 21.63 18 30 18c7.038 0 11.578.531 18.314 1.901.115.023.23.047.345.07l.885.182c.032.007.064.014.096.021h4.756l-.506-.172c-1.104-.374-2.47-.864-4.397-1.532C40.957 14.955 36.757 14 30 14c-7.614 0-12.679.851-21.047 2.48-.569.11-1.139.224-1.707.345l-.109.023c-.31.065-.622.13-.932.197h4.756z' fill='%23CA94C9' fill-opacity='1' fill-rule='evenodd'/%3E%3C/svg%3E")`,
+                backgroundRepeat: 'repeat'
+              }} 
+            />
+          </>
+        )}
         {[...Array(150)].map((_, i) => (
           <div 
             key={i}
-            className="absolute rounded-full bg-white opacity-10 animate-pulse"
+            className={cn(
+              "absolute rounded-full animate-pulse transition-opacity duration-1000",
+              theme === 'dark' ? "bg-white opacity-10" : "bg-brand/60 opacity-80"
+            )}
             style={{
               top: `${Math.random() * 100}%`,
               left: `${Math.random() * 100}%`,
-              width: `${1 + Math.random() * 2}px`,
-              height: `${1 + Math.random() * 2}px`,
+              width: `${theme === 'light' ? 2 + Math.random() * 2 : 1 + Math.random() * 2}px`,
+              height: `${theme === 'light' ? 2 + Math.random() * 2 : 1 + Math.random() * 2}px`,
               animationDelay: `${Math.random() * 5}s`,
               animationDuration: `${3 + Math.random() * 4}s`,
-              boxShadow: Math.random() > 0.9 ? '0 0 10px 1px rgba(192, 132, 252, 0.4)' : 'none'
+              boxShadow: theme === 'dark' 
+                ? (Math.random() > 0.9 ? '0 0 10px 1px rgba(192, 132, 252, 0.4)' : 'none')
+                : (Math.random() > 0.9 ? '0 0 12px 2px rgba(202, 148, 201, 0.8)' : 'none')
             }}
           />
         ))}
-        <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-brand/5 rounded-full blur-[120px] animate-pulse" />
-        <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-purple-500/5 rounded-full blur-[120px] animate-pulse" />
+        {theme === 'dark' && (
+          <>
+            <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-brand/5 rounded-full blur-[120px] animate-pulse" />
+            <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-purple-500/5 rounded-full blur-[120px] animate-pulse" />
+          </>
+        )}
       </div>
 
       {dbError && (
@@ -882,15 +1034,24 @@ export default function App() {
       )}
       {/* Header with Gradient */}
       {/* Header Section with Galaxy Effect */}
-      <div className="relative overflow-hidden pt-12 pb-20 px-4 md:px-8 border-b border-zinc-800/50 z-10">
+      <div className={cn(
+        "relative overflow-hidden pt-12 pb-20 px-4 md:px-8 border-b z-10 transition-colors duration-500",
+        theme === 'dark' ? "border-zinc-800/50" : "border-zinc-200"
+      )}>
         <header className="max-w-6xl mx-auto flex flex-col md:flex-row justify-between items-center gap-8 relative z-20">
           <div className="flex flex-col md:flex-row items-center gap-8">
-            <Logo size="md" />
-            <div className="h-px w-12 md:h-12 md:w-px bg-white/10 hidden md:block" />
+            <Logo size="md" theme={theme} />
+            <div className={cn(
+              "h-px w-12 md:h-12 md:w-px hidden md:block transition-colors duration-500",
+              theme === 'dark' ? "bg-white/10" : "bg-zinc-200"
+            )} />
             <div className="flex flex-col items-center md:items-start gap-1">
               <div className="flex items-center gap-2">
                 {isEditingName ? (
-                  <div className="flex items-center gap-2 bg-black/40 backdrop-blur-md p-1 rounded-xl border border-white/10">
+                  <div className={cn(
+                    "flex items-center gap-2 backdrop-blur-md p-1 rounded-xl border transition-all duration-500",
+                    theme === 'dark' ? "bg-black/40 border-white/10" : "bg-white border-zinc-200 shadow-sm"
+                  )}>
                     <input 
                       type="text" 
                       value={userName}
@@ -898,20 +1059,29 @@ export default function App() {
                       onKeyDown={e => e.key === 'Enter' && userName && handleSaveName()}
                       autoFocus
                       placeholder="Seu nome"
-                      className="bg-transparent px-3 py-1 text-[16px] font-bold focus:outline-none text-white w-40"
+                      className={cn(
+                        "bg-transparent px-3 py-1 text-[16px] font-bold focus:outline-none w-40",
+                        theme === 'dark' ? "text-white" : "text-zinc-900"
+                      )}
                     />
                     <button 
                       onClick={handleSaveName} 
                       disabled={isSubmitting}
                       className="bg-brand text-white p-1.5 rounded-lg hover:scale-110 transition-transform disabled:opacity-50"
                     >
-                      {isSubmitting ? <Loader2 className="animate-spin" size={16} /> : <Save size={16} />}
+                      {isSubmitting ? <Loader2 className="animate-spin" size={16} /> : (isSuccess ? <Check size={16} className="text-emerald-400" /> : <Save size={16} />)}
                     </button>
                   </div>
                 ) : (
-                  <div className="flex items-center gap-2 group/name bg-black/20 backdrop-blur-sm px-4 py-1.5 rounded-full border border-white/5">
-                    <h2 className="text-zinc-400 text-[12px] font-bold uppercase tracking-widest">
-                      Bem-vindo, <span className="text-white font-black">{userName || 'Usuário'}</span>
+                  <div className={cn(
+                    "flex items-center gap-2 group/name backdrop-blur-sm px-4 py-1.5 rounded-full border transition-all duration-500",
+                    theme === 'dark' ? "bg-black/20 border-white/5" : "bg-white border-zinc-200 shadow-sm"
+                  )}>
+                    <h2 className={cn(
+                      "text-[12px] font-bold uppercase tracking-widest transition-colors duration-500",
+                      theme === 'dark' ? "text-zinc-400" : "text-zinc-500"
+                    )}>
+                      Bem-vindo, <span className={cn("font-black", theme === 'dark' ? "text-white" : "text-zinc-900")}>{userName || 'Usuário'}</span>
                     </h2>
                     <button onClick={() => setIsEditingName(true)} className="text-zinc-500 hover:text-brand transition-colors opacity-0 group-hover/name:opacity-100">
                       <Pencil size={12} />
@@ -924,6 +1094,16 @@ export default function App() {
           
           <div className="flex flex-col md:flex-row items-center gap-4 w-full md:w-auto">
             <div className="flex items-center gap-2">
+              <button 
+                onClick={toggleTheme}
+                className={cn(
+                  "p-2 rounded-lg transition-all flex items-center gap-2 text-xs font-bold uppercase tracking-widest",
+                  theme === 'dark' ? "bg-zinc-800 text-zinc-400 hover:text-white" : "bg-white border border-zinc-200 text-zinc-600 hover:text-zinc-900 shadow-sm"
+                )}
+                title={theme === 'dark' ? "Mudar para modo claro" : "Mudar para modo escuro"}
+              >
+                {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
+              </button>
               {isAdmin && (
               <button 
                 onClick={() => setShowAdminPanel(true)}
@@ -934,7 +1114,10 @@ export default function App() {
             )}
             <button 
               onClick={() => supabase.auth.signOut()}
-              className="bg-zinc-800/50 hover:bg-zinc-800 p-2 rounded-lg text-zinc-400 hover:text-white transition-all flex items-center gap-2 text-xs font-bold"
+              className={cn(
+                "p-2 rounded-lg transition-all flex items-center gap-2 text-xs font-bold",
+                theme === 'dark' ? "bg-zinc-800/50 hover:bg-zinc-800 text-zinc-400 hover:text-white" : "bg-white border border-zinc-200 text-zinc-500 hover:text-zinc-900 shadow-sm"
+              )}
             >
               <LogOut size={16} /> Sair
             </button>
@@ -947,22 +1130,34 @@ export default function App() {
               </button>
             )}
             </div>
-            <div className="flex items-center gap-4 bg-black/40 backdrop-blur-xl p-2.5 rounded-2xl border border-white/10 shadow-2xl w-full max-w-[320px] md:w-auto justify-between md:justify-center">
+            <div className={cn(
+              "flex items-center gap-4 backdrop-blur-xl p-2.5 rounded-2xl border shadow-2xl w-full max-w-[320px] md:w-auto justify-between md:justify-center transition-all duration-500",
+              theme === 'dark' ? "bg-black/40 border-white/10" : "bg-white border-zinc-200"
+            )}>
             <button 
               onClick={() => setCurrentDate(subMonths(currentDate, 1))}
-              className="p-2.5 hover:bg-white/5 rounded-xl transition-all hover:scale-105 active:scale-95 text-zinc-400 hover:text-white"
+              className={cn(
+                "p-2.5 rounded-xl transition-all hover:scale-105 active:scale-95",
+                theme === 'dark' ? "hover:bg-white/5 text-zinc-400 hover:text-white" : "hover:bg-zinc-100 text-zinc-500 hover:text-zinc-900"
+              )}
             >
               <ChevronLeft size={24} />
             </button>
               <div className="flex flex-col items-center gap-0 min-w-[140px] md:min-w-[160px] justify-center">
               <span className="text-[10px] uppercase tracking-[0.3em] text-brand font-black mb-0.5">Período Atual</span>
-              <div className="flex items-center gap-2 font-bold text-white text-lg">
+              <div className={cn(
+                "flex items-center gap-2 font-bold text-lg transition-colors duration-500",
+                theme === 'dark' ? "text-white" : "text-zinc-900"
+              )}>
                 {format(currentDate, 'MMMM yyyy', { locale: ptBR })}
               </div>
             </div>
             <button 
               onClick={() => setCurrentDate(addMonths(currentDate, 1))}
-              className="p-2.5 hover:bg-white/5 rounded-xl transition-all hover:scale-105 active:scale-95 text-zinc-400 hover:text-white"
+              className={cn(
+                "p-2.5 rounded-xl transition-all hover:scale-105 active:scale-95",
+                theme === 'dark' ? "hover:bg-white/5 text-zinc-400 hover:text-white" : "hover:bg-zinc-100 text-zinc-500 hover:text-zinc-900"
+              )}
             >
               <ChevronRight size={24} />
             </button>
@@ -976,7 +1171,10 @@ export default function App() {
         <div className="lg:col-span-2 space-y-8">
           {/* Cards Summary */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="bg-zinc-900/60 backdrop-blur-md border border-zinc-800 p-5 rounded-2xl relative overflow-hidden group shadow-lg flex flex-col justify-center">
+            <div className={cn(
+              "backdrop-blur-md border p-5 rounded-2xl relative overflow-hidden group shadow-lg flex flex-col justify-center transition-all duration-500",
+              theme === 'dark' ? "bg-zinc-900/60 border-zinc-800" : "bg-white border-zinc-200"
+            )}>
               <div className="absolute top-0 right-0 p-3 opacity-10 group-hover:opacity-20 transition-opacity pointer-events-none">
                 <TrendingUp size={48} />
               </div>
@@ -984,7 +1182,10 @@ export default function App() {
               <h3 className="text-xl font-black text-emerald-400">{formatCurrency(totals.income)}</h3>
             </div>
             
-            <div className="bg-zinc-900/60 backdrop-blur-md border border-zinc-800 p-5 rounded-2xl relative overflow-hidden group shadow-lg flex flex-col justify-center">
+            <div className={cn(
+              "backdrop-blur-md border p-5 rounded-2xl relative overflow-hidden group shadow-lg flex flex-col justify-center transition-all duration-500",
+              theme === 'dark' ? "bg-zinc-900/60 border-zinc-800" : "bg-white border-zinc-200"
+            )}>
               <div className="absolute top-0 right-0 p-3 opacity-10 group-hover:opacity-20 transition-opacity pointer-events-none">
                 <TrendingDown size={48} />
               </div>
@@ -1010,7 +1211,10 @@ export default function App() {
               <h3 className="text-xl font-black text-rose-400">{formatCurrency(totals.expense)}</h3>
             </div>
 
-            <div className="bg-zinc-900/60 backdrop-blur-md border border-zinc-800 p-5 rounded-2xl relative overflow-hidden group shadow-lg flex flex-col justify-center">
+            <div className={cn(
+              "backdrop-blur-md border p-5 rounded-2xl relative overflow-hidden group shadow-lg flex flex-col justify-center transition-all duration-500",
+              theme === 'dark' ? "bg-zinc-900/60 border-zinc-800" : "bg-white border-zinc-200"
+            )}>
               <div className="absolute top-0 right-0 p-3 opacity-10 group-hover:opacity-20 transition-opacity pointer-events-none">
                 <Wallet size={48} className={cn(totals.income - totals.expense >= 0 ? "text-emerald-500" : "text-rose-500")} />
               </div>
@@ -1026,7 +1230,10 @@ export default function App() {
               </p>
             </div>
 
-            <div className="bg-zinc-900/60 backdrop-blur-md border border-brand/30 p-5 rounded-2xl relative overflow-hidden group shadow-lg flex flex-col justify-center">
+            <div className={cn(
+              "backdrop-blur-md border p-5 rounded-2xl relative overflow-hidden group shadow-lg flex flex-col justify-center transition-all duration-500",
+              theme === 'dark' ? "bg-zinc-900/60 border-brand/30" : "bg-white border-brand/20"
+            )}>
               <div className="absolute top-0 right-0 p-3 opacity-10 group-hover:opacity-20 transition-opacity pointer-events-none">
                 <AlertCircle size={48} className="text-brand" />
               </div>
@@ -1036,12 +1243,15 @@ export default function App() {
                   value={debtView} 
                   onClick={(e) => e.stopPropagation()}
                   onChange={(e) => setDebtView(e.target.value as typeof debtView)}
-                  className="bg-zinc-800 text-[10px] text-brand font-bold uppercase border border-zinc-700 rounded-md px-1.5 py-0.5 focus:ring-1 focus:ring-brand cursor-pointer relative z-20 hover:bg-zinc-700 transition-colors"
+                  className={cn(
+                    "text-[10px] text-brand font-bold uppercase border rounded-md px-1.5 py-0.5 focus:ring-1 focus:ring-brand cursor-pointer relative z-20 transition-colors",
+                    theme === 'dark' ? "bg-zinc-800 border-zinc-700 hover:bg-zinc-700" : "bg-zinc-100 border-zinc-200 hover:bg-zinc-200"
+                  )}
                 >
-                  <option value="future" className="bg-zinc-900">Futura</option>
-                  <option value="annual" className="bg-zinc-900">Anual</option>
-                  <option value="installments" className="bg-zinc-900">Parcelada</option>
-                  <option value="all" className="bg-zinc-900">Total</option>
+                  <option value="future" className={theme === 'dark' ? "bg-zinc-900" : "bg-white"}>Futura</option>
+                  <option value="annual" className={theme === 'dark' ? "bg-zinc-900" : "bg-white"}>Anual</option>
+                  <option value="installments" className={theme === 'dark' ? "bg-zinc-900" : "bg-white"}>Parcelada</option>
+                  <option value="all" className={theme === 'dark' ? "bg-zinc-900" : "bg-white"}>Total</option>
                 </select>
               </div>
               <h3 className="text-xl font-black text-brand">{formatCurrency(debtTotal)}</h3>
@@ -1053,7 +1263,10 @@ export default function App() {
               </p>
             </div>
 
-            <div className="bg-zinc-900/60 backdrop-blur-md border border-brand/30 p-5 rounded-2xl relative overflow-hidden group shadow-lg cursor-pointer hover:border-brand/60 transition-all flex flex-col justify-center" onClick={() => setShowInvestmentModal(true)}>
+            <div className={cn(
+              "backdrop-blur-md border p-5 rounded-2xl relative overflow-hidden group shadow-lg cursor-pointer transition-all flex flex-col justify-center",
+              theme === 'dark' ? "bg-zinc-900/60 border-brand/30 hover:border-brand/60" : "bg-brand/5 border-brand/20 hover:border-brand/40"
+            )} onClick={() => setShowInvestmentModal(true)}>
               <div className="absolute top-0 right-0 p-3 opacity-10 group-hover:opacity-20 transition-opacity pointer-events-none">
                 <TrendingUp size={48} className="text-brand" />
               </div>
@@ -1066,10 +1279,13 @@ export default function App() {
                     e.stopPropagation();
                     setInvestmentView(e.target.value as any);
                   }}
-                  className="bg-zinc-800 text-[10px] text-brand font-bold uppercase border border-zinc-700 rounded-md px-1.5 py-0.5 focus:ring-1 focus:ring-brand cursor-pointer relative z-20 hover:bg-zinc-700 transition-colors"
+                  className={cn(
+                    "text-[10px] text-brand font-bold uppercase border rounded-md px-1.5 py-0.5 focus:ring-1 focus:ring-brand cursor-pointer relative z-20 transition-colors",
+                    theme === 'dark' ? "bg-zinc-800 border-zinc-700 hover:bg-zinc-700" : "bg-zinc-100 border-zinc-200 hover:bg-zinc-200"
+                  )}
                 >
-                  <option value="monthly" className="bg-zinc-900">Mensal</option>
-                  <option value="total" className="bg-zinc-900">Total</option>
+                  <option value="monthly" className={theme === 'dark' ? "bg-zinc-900" : "bg-white"}>Mensal</option>
+                  <option value="total" className={theme === 'dark' ? "bg-zinc-900" : "bg-white"}>Total</option>
                 </select>
               </div>
               <h3 className="text-xl font-black text-brand">
@@ -1096,7 +1312,7 @@ export default function App() {
                     <div className="absolute -right-8 -top-8 w-32 h-32 bg-white/10 rounded-full blur-2xl" />
                     <div className="flex justify-between items-start">
                       <div className="bg-white/20 p-2 rounded-lg backdrop-blur-md">
-                        <CreditCard size={24} />
+                        <CreditCard size={24} className="text-white" />
                       </div>
                       <div className="flex items-center gap-2">
                         <button 
@@ -1113,7 +1329,7 @@ export default function App() {
                     </div>
                     <div>
                       <p className="text-white/60 text-xs uppercase tracking-widest mb-1">{card.name}</p>
-                      <p className="text-2xl font-black">{formatCurrency(card.total)}</p>
+                      <p className="text-2xl font-black text-white">{formatCurrency(card.total)}</p>
                       <p className="text-[10px] text-white/40 mt-1 uppercase tracking-tighter">Gasto no mês atual</p>
                     </div>
                   </div>
@@ -1124,7 +1340,10 @@ export default function App() {
 
           {/* Charts Section */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="bg-zinc-900 border border-zinc-800 p-6 rounded-3xl shadow-xl">
+            <div className={cn(
+              "border p-6 rounded-3xl shadow-xl transition-all duration-500",
+              theme === 'dark' ? "bg-zinc-900 border-zinc-800" : "bg-white border-zinc-200"
+            )}>
               <h4 className="text-lg font-bold mb-4 flex items-center gap-2">
                 <PieChartIcon size={20} className="text-brand" /> Categorias
               </h4>
@@ -1146,8 +1365,13 @@ export default function App() {
                         ))}
                       </Pie>
                       <Tooltip 
-                        contentStyle={{ backgroundColor: '#18181b', border: '1px solid #27272a', borderRadius: '12px' }}
-                        itemStyle={{ color: '#fff' }}
+                        contentStyle={{ 
+                          backgroundColor: theme === 'dark' ? '#18181b' : '#fff', 
+                          border: theme === 'dark' ? '1px solid #27272a' : '1px solid #e4e4e7', 
+                          borderRadius: '12px',
+                          color: theme === 'dark' ? '#fff' : '#18181b'
+                        }}
+                        itemStyle={{ color: theme === 'dark' ? '#fff' : '#18181b' }}
                         formatter={(value: number) => formatCurrency(value)}
                       />
                       <Legend 
@@ -1165,7 +1389,10 @@ export default function App() {
                 )}
               </div>
               {categoryData.length > 0 && (
-                <div className="mt-4 space-y-2 border-t border-zinc-800 pt-4">
+                <div className={cn(
+                  "mt-4 space-y-2 border-t pt-4 transition-colors duration-500",
+                  theme === 'dark' ? "border-zinc-800" : "border-zinc-100"
+                )}>
                   <div className="flex justify-between text-[10px] uppercase tracking-widest">
                     <span className="text-zinc-500">Maior Gasto:</span>
                     <span className="font-black text-rose-400">{mostSpentCategory.name} ({formatCurrency(mostSpentCategory.value)})</span>
@@ -1178,19 +1405,30 @@ export default function App() {
               )}
             </div>
 
-            <div className="bg-zinc-900 border border-zinc-800 p-6 rounded-3xl shadow-xl">
+            <div className={cn(
+              "border p-6 rounded-3xl shadow-xl transition-all duration-500",
+              theme === 'dark' ? "bg-zinc-900 border-zinc-800" : "bg-white border-zinc-200"
+            )}>
               <h4 className="text-lg font-bold mb-4 flex items-center gap-2">
                 <BarChartIcon size={20} className="text-brand" /> Balanço
               </h4>
-              <div className="h-[250px] w-full bg-zinc-900 rounded-2xl">
+              <div className={cn(
+                "h-[250px] w-full rounded-2xl transition-colors duration-500",
+                theme === 'dark' ? "bg-zinc-900" : "bg-zinc-50"
+              )}>
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={[{ name: 'Balanço', ganhos: totals.income, gastos: totals.expense }]}>
-                    <XAxis dataKey="name" stroke="#52525b" />
-                    <YAxis stroke="#52525b" hide />
+                    <XAxis dataKey="name" stroke={theme === 'dark' ? "#52525b" : "#a1a1aa"} />
+                    <YAxis stroke={theme === 'dark' ? "#52525b" : "#a1a1aa"} hide />
                     <Tooltip 
-                      contentStyle={{ backgroundColor: '#18181b', border: '1px solid #27272a', borderRadius: '12px' }}
-                      itemStyle={{ color: '#fff' }}
-                      cursor={{ fill: 'rgba(255, 255, 255, 0.05)' }}
+                      contentStyle={{ 
+                        backgroundColor: theme === 'dark' ? '#18181b' : '#fff', 
+                        border: theme === 'dark' ? '1px solid #27272a' : '1px solid #e4e4e7', 
+                        borderRadius: '12px',
+                        color: theme === 'dark' ? '#fff' : '#18181b'
+                      }}
+                      itemStyle={{ color: theme === 'dark' ? '#fff' : '#18181b' }}
+                      cursor={{ fill: theme === 'dark' ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.02)' }}
                       formatter={(value: number) => formatCurrency(value)}
                     />
                     <Bar dataKey="ganhos" fill="#10b981" radius={[4, 4, 0, 0]} />
@@ -1202,8 +1440,14 @@ export default function App() {
           </div>
 
           {/* Transactions List */}
-          <div className="bg-zinc-900 border border-zinc-800 rounded-3xl overflow-hidden shadow-xl">
-            <div className="p-6 border-b border-zinc-800 flex justify-between items-center">
+          <div className={cn(
+            "border rounded-3xl overflow-hidden shadow-xl transition-all duration-500",
+            theme === 'dark' ? "bg-zinc-900 border-zinc-800" : "bg-white border-zinc-200"
+          )}>
+            <div className={cn(
+              "p-6 border-b flex justify-between items-center transition-colors duration-500",
+              theme === 'dark' ? "border-zinc-800" : "border-zinc-100"
+            )}>
               <h4 className="text-lg font-bold flex items-center gap-2">
                 <Wallet size={20} className="text-brand" /> Transações
               </h4>
@@ -1285,7 +1529,10 @@ export default function App() {
         {/* Right Column: Investments & Quick Actions */}
         <div className="space-y-8">
           {/* Goals Section */}
-          <div className="bg-zinc-900 border border-zinc-800 p-6 rounded-3xl shadow-xl">
+          <div className={cn(
+            "border p-6 rounded-3xl shadow-xl transition-all duration-500",
+            theme === 'dark' ? "bg-zinc-900 border-zinc-800" : "bg-white border-zinc-200"
+          )}>
             <div className="flex justify-between items-center mb-6">
               <h4 className="text-lg font-bold flex items-center gap-2">
                 <Target size={20} className="text-brand" /> Minhas Metas
@@ -1302,10 +1549,16 @@ export default function App() {
               {goals.length > 0 ? goals.map(goal => {
                 const progress = Math.min((goal.currentAmount / goal.targetAmount) * 100, 100);
                 return (
-                  <div key={goal.id} className="space-y-3 group bg-zinc-800/20 p-3 rounded-2xl border border-zinc-800/50">
+                  <div 
+                    key={goal.id} 
+                    className={cn(
+                      "space-y-3 group p-3 rounded-2xl border transition-all duration-500",
+                      theme === 'dark' ? "bg-zinc-800/20 border-zinc-800/50" : "bg-zinc-50 border-zinc-200"
+                    )}
+                  >
                     <div className="flex justify-between items-start">
                       <div>
-                        <p className="font-bold text-sm">{goal.title}</p>
+                        <p className={cn("font-bold text-sm transition-colors duration-500", theme === 'dark' ? "text-white" : "text-zinc-900")}>{goal.title}</p>
                         <p className="text-[10px] text-zinc-500 uppercase tracking-tighter">
                           {goal.type === 'monthly' ? 'Mensal' : 'Fixo'}
                           {goal.deadline && ` • Até ${format(parseISO(goal.deadline), 'dd/MM/yy')}`}
@@ -1316,7 +1569,10 @@ export default function App() {
                           e.stopPropagation();
                           deleteGoal(goal.id);
                         }}
-                        className="text-zinc-600 hover:text-rose-500 p-2 hover:bg-rose-500/10 rounded-lg transition-all"
+                        className={cn(
+                          "p-2 rounded-lg transition-all",
+                          theme === 'dark' ? "text-zinc-600 hover:text-rose-500 hover:bg-rose-500/10" : "text-zinc-400 hover:text-rose-500 hover:bg-rose-50"
+                        )}
                       >
                         <Trash2 size={16} />
                       </button>
@@ -1327,7 +1583,10 @@ export default function App() {
                         <span className="text-brand">{formatCurrency(goal.currentAmount)}</span>
                         <span className="text-zinc-500">alvo: {formatCurrency(goal.targetAmount)}</span>
                       </div>
-                      <div className="h-2 bg-zinc-800 rounded-full overflow-hidden">
+                      <div className={cn(
+                        "h-2 rounded-full overflow-hidden transition-colors duration-500",
+                        theme === 'dark' ? "bg-zinc-800" : "bg-zinc-100"
+                      )}>
                         <div 
                           className="h-full bg-gradient-to-r from-brand-dark to-brand transition-all duration-500" 
                           style={{ width: `${progress}%`, backgroundColor: goal.color || '#CA94C9' }}
@@ -1339,7 +1598,10 @@ export default function App() {
                       <input 
                         type="number" 
                         placeholder="Valor guardado"
-                        className="flex-1 bg-zinc-900 border border-zinc-700 rounded-lg px-2 py-1 text-xs focus:outline-none focus:border-brand"
+                        className={cn(
+                          "flex-1 border rounded-lg px-2 py-1 text-xs focus:outline-none focus:border-brand transition-all duration-500",
+                          theme === 'dark' ? "bg-zinc-900 border-zinc-700 text-white" : "bg-white border-zinc-200 text-zinc-900"
+                        )}
                         onBlur={(e) => {
                           const val = parseFloat(e.target.value);
                           if (!isNaN(val)) updateGoalAmount(goal.id, val);
@@ -1359,7 +1621,10 @@ export default function App() {
           </div>
 
           {/* Investments Section */}
-          <div className="bg-zinc-900 border border-zinc-800 p-6 rounded-3xl shadow-xl">
+          <div className={cn(
+            "border p-6 rounded-3xl shadow-xl transition-all duration-500",
+            theme === 'dark' ? "bg-zinc-900 border-zinc-800" : "bg-white border-zinc-200"
+          )}>
             <div className="flex justify-between items-center mb-6">
               <h4 className="text-lg font-bold flex items-center gap-2">
                 <TrendingUp size={20} className="text-brand" /> Investimentos
@@ -1386,10 +1651,16 @@ export default function App() {
                 const progress = hasGoal ? Math.min((inv.amount / inv.targetAmount!) * 100, 100) : 0;
                 
                 return (
-                  <div key={inv.id} className="group bg-zinc-800/20 p-4 rounded-2xl border border-zinc-800/50 hover:border-brand/30 transition-all">
+                  <div 
+                    key={inv.id} 
+                    className={cn(
+                      "group p-4 rounded-2xl border transition-all duration-500",
+                      theme === 'dark' ? "bg-zinc-800/20 border-zinc-800/50 hover:border-brand/30" : "bg-zinc-50 border-zinc-200 hover:border-brand/30"
+                    )}
+                  >
                     <div className="flex justify-between items-start mb-2">
                       <div>
-                        <p className="font-bold text-sm">{inv.description}</p>
+                        <p className={cn("font-bold text-sm transition-colors duration-500", theme === 'dark' ? "text-white" : "text-zinc-900")}>{inv.description}</p>
                         <p className="text-[10px] text-zinc-500 uppercase tracking-tighter">
                           {inv.type === 'monthly' ? 'Mensal' : 'Fixo'} • {format(parseISO(inv.date), 'dd/MM/yyyy')}
                         </p>
@@ -1397,13 +1668,19 @@ export default function App() {
                       <div className="flex items-center gap-1">
                         <button 
                           onClick={() => editInvestment(inv)}
-                          className="text-zinc-600 hover:text-brand p-1.5 hover:bg-brand/10 rounded-lg transition-all"
+                          className={cn(
+                            "p-1.5 rounded-lg transition-all",
+                            theme === 'dark' ? "text-zinc-600 hover:text-brand hover:bg-brand/10" : "text-zinc-400 hover:text-brand hover:bg-zinc-100"
+                          )}
                         >
                           <Pencil size={14} />
                         </button>
                         <button 
                           onClick={() => deleteInvestment(inv.id)}
-                          className="text-zinc-600 hover:text-rose-500 p-1.5 hover:bg-rose-500/10 rounded-lg transition-all"
+                          className={cn(
+                            "p-1.5 rounded-lg transition-all",
+                            theme === 'dark' ? "text-zinc-600 hover:text-rose-500 hover:bg-rose-500/10" : "text-zinc-400 hover:text-rose-500 hover:bg-rose-50"
+                          )}
                         >
                           <Trash2 size={14} />
                         </button>
@@ -1425,7 +1702,10 @@ export default function App() {
                           <span className="text-zinc-500">Progresso</span>
                           <span className="text-brand">{progress.toFixed(1)}%</span>
                         </div>
-                        <div className="h-1.5 w-full bg-zinc-800 rounded-full overflow-hidden">
+                        <div className={cn(
+                          "h-1.5 w-full rounded-full overflow-hidden transition-colors duration-500",
+                          theme === 'dark' ? "bg-zinc-800" : "bg-zinc-100"
+                        )}>
                           <motion.div 
                             initial={{ width: 0 }}
                             animate={{ width: `${progress}%` }}
@@ -1437,7 +1717,10 @@ export default function App() {
                           <input 
                             type="number" 
                             placeholder="Valor atual"
-                            className="flex-1 bg-zinc-900/50 border border-zinc-700/50 rounded-lg px-2 py-1 text-[10px] focus:outline-none focus:border-brand"
+                            className={cn(
+                              "flex-1 border rounded-lg px-2 py-1 text-[10px] focus:outline-none focus:border-brand transition-all duration-500",
+                              theme === 'dark' ? "bg-zinc-900/50 border-zinc-700/50 text-white" : "bg-white border-zinc-200 text-zinc-900"
+                            )}
                             onBlur={(e) => {
                               const val = parseFloat(e.target.value);
                               if (!isNaN(val)) updateInvestmentAmount(inv.id, val);
@@ -1462,7 +1745,10 @@ export default function App() {
             <h5 className="font-bold text-brand mb-2 flex items-center gap-2 uppercase tracking-widest text-xs">
               💡 Dica do Mês
             </h5>
-            <p className="text-sm text-zinc-300 leading-relaxed italic">
+            <p className={cn(
+              "text-sm leading-relaxed italic transition-colors duration-500",
+              theme === 'dark' ? "text-zinc-300" : "text-zinc-700"
+            )}>
               {[
                 "O controle financeiro não é sobre quanto você ganha, mas sobre como você gerencia o que tem.",
                 "Pague-se primeiro: reserve uma parte do seu salário para investimentos antes de pagar as contas.",
@@ -1490,10 +1776,14 @@ export default function App() {
       </footer>
 
       {/* Investment Modal */}
+      {/* Investment Modal */}
       {showInvestmentModal && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-zinc-900 border border-zinc-800 w-full max-w-md rounded-3xl p-8 shadow-2xl">
-            <h3 className="text-2xl font-black mb-6 flex items-center gap-2 uppercase tracking-tighter">
+          <div className={cn(
+            "border w-full max-w-md rounded-3xl p-8 shadow-2xl transition-all duration-500",
+            theme === 'dark' ? "bg-zinc-900 border-zinc-800" : "bg-white border-zinc-200"
+          )}>
+            <h3 className={cn("text-2xl font-black mb-6 flex items-center gap-2 uppercase tracking-tighter transition-colors duration-500", theme === 'dark' ? "text-white" : "text-zinc-900")}>
               <TrendingUp className="text-brand" />
               {editingInvestmentId ? 'Editar Investimento' : 'Novo Investimento'}
             </h3>
@@ -1506,7 +1796,10 @@ export default function App() {
                   type="text" 
                   value={investmentDescription}
                   onChange={e => setInvestmentDescription(e.target.value)}
-                  className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-brand/50"
+                  className={cn(
+                    "w-full border rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-brand/50 transition-all duration-500 font-bold",
+                    theme === 'dark' ? "bg-zinc-800 border-zinc-700 text-white" : "bg-zinc-50 border-zinc-200 text-zinc-900"
+                  )}
                   placeholder="Ex: Tesouro Direto, Ações..."
                 />
               </div>
@@ -1520,7 +1813,10 @@ export default function App() {
                     step="0.01"
                     value={investmentAmount}
                     onChange={e => setInvestmentAmount(e.target.value)}
-                    className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-brand/50"
+                    className={cn(
+                      "w-full border rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-brand/50 transition-all duration-500 font-bold",
+                      theme === 'dark' ? "bg-zinc-800 border-zinc-700 text-white" : "bg-zinc-50 border-zinc-200 text-zinc-900"
+                    )}
                     placeholder="0,00"
                   />
                 </div>
@@ -1531,7 +1827,10 @@ export default function App() {
                     step="0.01"
                     value={investmentTargetAmount}
                     onChange={e => setInvestmentTargetAmount(e.target.value)}
-                    className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-brand/50"
+                    className={cn(
+                      "w-full border rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-brand/50 transition-all duration-500 font-bold",
+                      theme === 'dark' ? "bg-zinc-800 border-zinc-700 text-white" : "bg-zinc-50 border-zinc-200 text-zinc-900"
+                    )}
                     placeholder="0,00"
                   />
                 </div>
@@ -1545,7 +1844,10 @@ export default function App() {
                     type="date" 
                     value={investmentDate}
                     onChange={e => setInvestmentDate(e.target.value)}
-                    className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-brand/50"
+                    className={cn(
+                      "w-full border rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-brand/50 transition-all duration-500 font-bold",
+                      theme === 'dark' ? "bg-zinc-800 border-zinc-700 text-white" : "bg-zinc-50 border-zinc-200 text-zinc-900"
+                    )}
                   />
                 </div>
                 <div>
@@ -1558,7 +1860,7 @@ export default function App() {
                         onClick={() => setInvestmentColor(c)}
                         className={cn(
                           "w-6 h-6 rounded-full border-2 transition-all",
-                          investmentColor === c ? "border-white scale-110" : "border-transparent opacity-50"
+                          investmentColor === c ? (theme === 'dark' ? "border-white scale-110" : "border-zinc-900 scale-110") : "border-transparent opacity-50"
                         )}
                         style={{ backgroundColor: c }}
                       />
@@ -1575,7 +1877,9 @@ export default function App() {
                     onClick={() => setInvestmentType('monthly')}
                     className={cn(
                       "py-2 rounded-xl text-xs font-bold transition-all",
-                      investmentType === 'monthly' ? "bg-brand text-white" : "bg-zinc-800 text-zinc-400"
+                      investmentType === 'monthly' 
+                        ? "bg-brand text-white" 
+                        : (theme === 'dark' ? "bg-zinc-800 text-zinc-400" : "bg-zinc-100 text-zinc-500")
                     )}
                   >
                     Mensal
@@ -1585,7 +1889,9 @@ export default function App() {
                     onClick={() => setInvestmentType('fixed')}
                     className={cn(
                       "py-2 rounded-xl text-xs font-bold transition-all",
-                      investmentType === 'fixed' ? "bg-brand text-white" : "bg-zinc-800 text-zinc-400"
+                      investmentType === 'fixed' 
+                        ? "bg-brand text-white" 
+                        : (theme === 'dark' ? "bg-zinc-800 text-zinc-400" : "bg-zinc-100 text-zinc-500")
                     )}
                   >
                     Fixo
@@ -1597,16 +1903,19 @@ export default function App() {
                 <button 
                   type="button"
                   onClick={() => setShowInvestmentModal(false)}
-                  className="flex-1 bg-zinc-800 hover:bg-zinc-700 text-white font-bold py-3 rounded-xl transition-all"
+                  className={cn(
+                    "flex-1 font-bold py-3 rounded-xl transition-all uppercase tracking-widest text-xs",
+                    theme === 'dark' ? "bg-zinc-800 hover:bg-zinc-700 text-white" : "bg-zinc-100 hover:bg-zinc-200 text-zinc-600"
+                  )}
                 >
                   Cancelar
                 </button>
                 <button 
                   type="submit"
                   disabled={isSubmitting}
-                  className="flex-1 bg-brand hover:bg-brand-dark disabled:opacity-50 text-white font-bold py-3 rounded-xl transition-all shadow-lg shadow-brand/20 flex items-center justify-center gap-2"
+                  className="flex-1 bg-brand hover:bg-brand-dark disabled:opacity-50 text-white font-bold py-3 rounded-xl transition-all shadow-lg shadow-brand/20 flex items-center justify-center gap-2 uppercase tracking-widest text-xs"
                 >
-                  {isSubmitting ? <Loader2 className="animate-spin" size={20} /> : (editingInvestmentId ? 'Salvar' : 'Adicionar')}
+                  {isSubmitting ? <Loader2 className="animate-spin" size={16} /> : (isSuccess ? <Check size={16} className="text-emerald-400" /> : (editingInvestmentId ? 'Salvar' : 'Adicionar'))}
                 </button>
               </div>
             </form>
@@ -1617,8 +1926,11 @@ export default function App() {
       {/* Add Transaction Modal */}
       {showAddModal && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-zinc-900 border border-zinc-800 w-full max-w-md rounded-3xl p-8 shadow-2xl">
-            <h3 className="text-2xl font-black mb-6 flex items-center gap-2 uppercase tracking-tighter">
+          <div className={cn(
+            "border w-full max-w-md rounded-3xl p-8 shadow-2xl transition-all duration-500",
+            theme === 'dark' ? "bg-zinc-900 border-zinc-800" : "bg-white border-zinc-200"
+          )}>
+            <h3 className={cn("text-2xl font-black mb-6 flex items-center gap-2 uppercase tracking-tighter transition-colors duration-500", theme === 'dark' ? "text-white" : "text-zinc-900")}>
               {modalType === 'income' ? <TrendingUp className="text-emerald-500" /> : <TrendingDown className="text-rose-500" />}
               Novo {modalType === 'income' ? 'Ganho' : 'Gasto'}
             </h3>
@@ -1631,7 +1943,10 @@ export default function App() {
                   type="text" 
                   value={description}
                   onChange={e => setDescription(e.target.value)}
-                  className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 focus:outline-none focus:border-brand transition-colors font-bold"
+                  className={cn(
+                    "w-full border rounded-xl px-4 py-3 focus:outline-none focus:border-brand transition-all duration-500 font-bold",
+                    theme === 'dark' ? "bg-zinc-800 border-zinc-700 text-white" : "bg-zinc-50 border-zinc-200 text-zinc-900"
+                  )}
                   placeholder="Ex: Aluguel, Supermercado..."
                 />
               </div>
@@ -1645,7 +1960,10 @@ export default function App() {
                     step="0.01"
                     value={amount}
                     onChange={e => setAmount(e.target.value)}
-                    className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 focus:outline-none focus:border-brand transition-colors font-bold"
+                    className={cn(
+                      "w-full border rounded-xl px-4 py-3 focus:outline-none focus:border-brand transition-all duration-500 font-bold",
+                      theme === 'dark' ? "bg-zinc-800 border-zinc-700 text-white" : "bg-zinc-50 border-zinc-200 text-zinc-900"
+                    )}
                     placeholder="0,00"
                   />
                 </div>
@@ -1656,7 +1974,10 @@ export default function App() {
                     min="1"
                     value={installments}
                     onChange={e => setInstallments(e.target.value)}
-                    className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 focus:outline-none focus:border-brand transition-colors font-bold"
+                    className={cn(
+                      "w-full border rounded-xl px-4 py-3 focus:outline-none focus:border-brand transition-all duration-500 font-bold",
+                      theme === 'dark' ? "bg-zinc-800 border-zinc-700 text-white" : "bg-zinc-50 border-zinc-200 text-zinc-900"
+                    )}
                   />
                 </div>
               </div>
@@ -1667,7 +1988,10 @@ export default function App() {
                   <select 
                     value={category}
                     onChange={e => setCategory(e.target.value)}
-                    className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 focus:outline-none focus:border-brand transition-colors font-bold"
+                    className={cn(
+                      "w-full border rounded-xl px-4 py-3 focus:outline-none focus:border-brand transition-all duration-500 font-bold",
+                      theme === 'dark' ? "bg-zinc-800 border-zinc-700 text-white" : "bg-zinc-50 border-zinc-200 text-zinc-900"
+                    )}
                   >
                     {CATEGORIES.map(c => (
                       <option key={c.name} value={c.name}>{c.icon} {c.name}</option>
@@ -1681,7 +2005,10 @@ export default function App() {
                     type="date" 
                     value={date}
                     onChange={e => setDate(e.target.value)}
-                    className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 focus:outline-none focus:border-brand transition-colors font-bold"
+                    className={cn(
+                      "w-full border rounded-xl px-4 py-3 focus:outline-none focus:border-brand transition-all duration-500 font-bold",
+                      theme === 'dark' ? "bg-zinc-800 border-zinc-700 text-white" : "bg-zinc-50 border-zinc-200 text-zinc-900"
+                    )}
                   />
                 </div>
               </div>
@@ -1693,7 +2020,10 @@ export default function App() {
                     <select 
                       value={paymentMethod}
                       onChange={e => setPaymentMethod(e.target.value as PaymentMethod)}
-                      className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 focus:outline-none focus:border-brand transition-colors font-bold"
+                      className={cn(
+                        "w-full border rounded-xl px-4 py-3 focus:outline-none focus:border-brand transition-all duration-500 font-bold",
+                        theme === 'dark' ? "bg-zinc-800 border-zinc-700 text-white" : "bg-zinc-50 border-zinc-200 text-zinc-900"
+                      )}
                     >
                       {PAYMENT_METHODS.map(m => (
                         <option key={m} value={m}>{m}</option>
@@ -1709,7 +2039,10 @@ export default function App() {
                           type="text" 
                           value={cardName}
                           onChange={e => setCardName(e.target.value)}
-                          className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 focus:outline-none focus:border-brand transition-colors font-bold"
+                          className={cn(
+                            "w-full border rounded-xl px-4 py-3 focus:outline-none focus:border-brand transition-all duration-500 font-bold",
+                            theme === 'dark' ? "bg-zinc-800 border-zinc-700 text-white" : "bg-zinc-50 border-zinc-200 text-zinc-900"
+                          )}
                           placeholder="Ex: Nubank, Inter..."
                         />
                       </div>
@@ -1724,7 +2057,9 @@ export default function App() {
                               className={cn(
                                 "w-8 h-8 rounded-full bg-gradient-to-br border-2 transition-all",
                                 color.value,
-                                cardColor === color.value ? "border-white scale-110" : "border-transparent opacity-60 hover:opacity-100"
+                                cardColor === color.value 
+                                  ? (theme === 'dark' ? "border-white scale-110" : "border-zinc-900 scale-110") 
+                                  : "border-transparent opacity-60 hover:opacity-100"
                               )}
                             />
                           ))}
@@ -1739,7 +2074,10 @@ export default function App() {
                 <button 
                   type="button"
                   onClick={() => setShowAddModal(false)}
-                  className="flex-1 bg-zinc-800 hover:bg-zinc-700 py-3 rounded-xl font-bold transition-colors uppercase tracking-widest text-xs"
+                  className={cn(
+                    "flex-1 py-3 rounded-xl font-bold transition-all uppercase tracking-widest text-xs",
+                    theme === 'dark' ? "bg-zinc-800 hover:bg-zinc-700 text-white" : "bg-zinc-100 hover:bg-zinc-200 text-zinc-600"
+                  )}
                 >
                   Cancelar
                 </button>
@@ -1748,7 +2086,7 @@ export default function App() {
                   disabled={isSubmitting}
                   className="flex-1 bg-brand-dark hover:bg-brand disabled:opacity-50 py-3 rounded-xl font-black transition-colors uppercase tracking-widest text-xs flex items-center justify-center gap-2"
                 >
-                  {isSubmitting ? <Loader2 className="animate-spin" size={16} /> : 'Salvar'}
+                  {isSubmitting ? <Loader2 className="animate-spin" size={16} /> : (isSuccess ? <Check size={16} className="text-emerald-400" /> : 'Salvar')}
                 </button>
               </div>
             </form>
@@ -1757,10 +2095,14 @@ export default function App() {
       )}
 
       {/* Add Goal Modal */}
+      {/* Goal Modal */}
       {showGoalModal && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-zinc-900 border border-zinc-800 w-full max-w-md rounded-3xl p-8 shadow-2xl">
-            <h3 className="text-2xl font-black mb-6 flex items-center gap-2 uppercase tracking-tighter">
+          <div className={cn(
+            "border w-full max-w-md rounded-3xl p-8 shadow-2xl transition-all duration-500",
+            theme === 'dark' ? "bg-zinc-900 border-zinc-800" : "bg-white border-zinc-200"
+          )}>
+            <h3 className={cn("text-2xl font-black mb-6 flex items-center gap-2 uppercase tracking-tighter transition-colors duration-500", theme === 'dark' ? "text-white" : "text-zinc-900")}>
               <Target className="text-brand" /> Nova Meta
             </h3>
             
@@ -1772,7 +2114,10 @@ export default function App() {
                   type="text" 
                   value={goalTitle}
                   onChange={e => setGoalTitle(e.target.value)}
-                  className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 focus:outline-none focus:border-brand transition-colors font-bold"
+                  className={cn(
+                    "w-full border rounded-xl px-4 py-3 focus:outline-none focus:border-brand transition-all duration-500 font-bold",
+                    theme === 'dark' ? "bg-zinc-800 border-zinc-700 text-white" : "bg-zinc-50 border-zinc-200 text-zinc-900"
+                  )}
                   placeholder="Ex: Viagem, Reserva de Emergência..."
                 />
               </div>
@@ -1786,7 +2131,10 @@ export default function App() {
                     step="0.01"
                     value={goalAmount}
                     onChange={e => setGoalAmount(e.target.value)}
-                    className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 focus:outline-none focus:border-brand transition-colors font-bold"
+                    className={cn(
+                      "w-full border rounded-xl px-4 py-3 focus:outline-none focus:border-brand transition-all duration-500 font-bold",
+                      theme === 'dark' ? "bg-zinc-800 border-zinc-700 text-white" : "bg-zinc-50 border-zinc-200 text-zinc-900"
+                    )}
                     placeholder="0,00"
                   />
                 </div>
@@ -1797,7 +2145,10 @@ export default function App() {
                     step="0.01"
                     value={goalCurrentAmount}
                     onChange={e => setGoalCurrentAmount(e.target.value)}
-                    className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 focus:outline-none focus:border-brand transition-colors font-bold"
+                    className={cn(
+                      "w-full border rounded-xl px-4 py-3 focus:outline-none focus:border-brand transition-all duration-500 font-bold",
+                      theme === 'dark' ? "bg-zinc-800 border-zinc-700 text-white" : "bg-zinc-50 border-zinc-200 text-zinc-900"
+                    )}
                     placeholder="0,00"
                   />
                 </div>
@@ -1809,7 +2160,10 @@ export default function App() {
                   <select 
                     value={goalType}
                     onChange={e => setGoalType(e.target.value as 'monthly' | 'fixed')}
-                    className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 focus:outline-none focus:border-brand transition-colors font-bold"
+                    className={cn(
+                      "w-full border rounded-xl px-4 py-3 focus:outline-none focus:border-brand transition-all duration-500 font-bold",
+                      theme === 'dark' ? "bg-zinc-800 border-zinc-700 text-white" : "bg-zinc-50 border-zinc-200 text-zinc-900"
+                    )}
                   >
                     <option value="monthly">Mensal</option>
                     <option value="fixed">Prazo Fixo</option>
@@ -1825,7 +2179,9 @@ export default function App() {
                         onClick={() => setGoalColor(c)}
                         className={cn(
                           "w-6 h-6 rounded-full border-2 transition-all",
-                          goalColor === c ? "border-white scale-110" : "border-transparent opacity-50"
+                          goalColor === c 
+                            ? (theme === 'dark' ? "border-white scale-110" : "border-zinc-900 scale-110") 
+                            : "border-transparent opacity-50"
                         )}
                         style={{ backgroundColor: c }}
                       />
@@ -1840,7 +2196,10 @@ export default function App() {
                   type="date" 
                   value={goalDeadline}
                   onChange={e => setGoalDeadline(e.target.value)}
-                  className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 focus:outline-none focus:border-brand transition-colors font-bold"
+                  className={cn(
+                    "w-full border rounded-xl px-4 py-3 focus:outline-none focus:border-brand transition-all duration-500 font-bold",
+                    theme === 'dark' ? "bg-zinc-800 border-zinc-700 text-white" : "bg-zinc-50 border-zinc-200 text-zinc-900"
+                  )}
                 />
               </div>
 
@@ -1848,7 +2207,10 @@ export default function App() {
                 <button 
                   type="button"
                   onClick={() => setShowGoalModal(false)}
-                  className="flex-1 bg-zinc-800 hover:bg-zinc-700 py-3 rounded-xl font-bold transition-colors uppercase tracking-widest text-xs"
+                  className={cn(
+                    "flex-1 py-3 rounded-xl font-bold transition-all uppercase tracking-widest text-xs",
+                    theme === 'dark' ? "bg-zinc-800 hover:bg-zinc-700 text-white" : "bg-zinc-100 hover:bg-zinc-200 text-zinc-600"
+                  )}
                 >
                   Cancelar
                 </button>
@@ -1857,7 +2219,7 @@ export default function App() {
                   disabled={isSubmitting}
                   className="flex-1 bg-brand-dark hover:bg-brand disabled:opacity-50 py-3 rounded-xl font-black transition-colors uppercase tracking-widest text-xs flex items-center justify-center gap-2"
                 >
-                  {isSubmitting ? <Loader2 className="animate-spin" size={16} /> : 'Criar Meta'}
+                  {isSubmitting ? <Loader2 className="animate-spin" size={16} /> : (isSuccess ? <Check size={16} className="text-emerald-400" /> : 'Criar Meta')}
                 </button>
               </div>
             </form>
@@ -1867,14 +2229,20 @@ export default function App() {
       {/* Admin Panel Modal */}
       {showAdminPanel && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-zinc-900 border border-zinc-800 w-full max-w-2xl rounded-3xl p-8 shadow-2xl max-h-[80vh] overflow-y-auto relative">
+          <div className={cn(
+            "border w-full max-w-2xl rounded-3xl p-8 shadow-2xl max-h-[80vh] overflow-y-auto relative transition-all duration-500",
+            theme === 'dark' ? "bg-zinc-900 border-zinc-800" : "bg-white border-zinc-200"
+          )}>
             <div className="flex justify-between items-center mb-8">
-              <h3 className="text-2xl font-black flex items-center gap-2 uppercase tracking-tighter">
+              <h3 className={cn("text-2xl font-black flex items-center gap-2 uppercase tracking-tighter transition-colors duration-500", theme === 'dark' ? "text-white" : "text-zinc-900")}>
                 <User className="text-brand" /> Painel Admin
               </h3>
               <button 
                 onClick={() => setShowAdminPanel(false)}
-                className="text-zinc-500 hover:text-white transition-colors"
+                className={cn(
+                  "transition-colors",
+                  theme === 'dark' ? "text-zinc-500 hover:text-white" : "text-zinc-400 hover:text-zinc-900"
+                )}
               >
                 Fechar
               </button>
@@ -1887,9 +2255,15 @@ export default function App() {
                 </p>
               ) : (
                 accessRequests.map((req) => (
-                  <div key={req.id} className="bg-zinc-800/50 border border-zinc-700/50 p-4 rounded-2xl flex items-center justify-between gap-4">
+                  <div 
+                    key={req.id} 
+                    className={cn(
+                      "border p-4 rounded-2xl flex items-center justify-between gap-4 transition-all duration-500",
+                      theme === 'dark' ? "bg-zinc-800/50 border-zinc-700/50" : "bg-zinc-50 border-zinc-200"
+                    )}
+                  >
                     <div>
-                      <p className="font-bold text-white">{req.email}</p>
+                      <p className={cn("font-bold transition-colors duration-500", theme === 'dark' ? "text-white" : "text-zinc-900")}>{req.email}</p>
                       <p className="text-[10px] text-zinc-500 uppercase tracking-widest font-bold">
                         Solicitado em: {format(parseISO(req.created_at), "dd/MM/yyyy HH:mm", { locale: ptBR })}
                       </p>
@@ -1909,7 +2283,10 @@ export default function App() {
                           <button 
                             onClick={() => setConfirmAction({ id: req.id, type: 'reject', email: req.email })}
                             disabled={isSubmitting}
-                            className="bg-rose-500/10 hover:bg-rose-500 text-rose-500 hover:text-white p-2 rounded-xl transition-all"
+                            className={cn(
+                              "p-2 rounded-xl transition-all",
+                              theme === 'dark' ? "bg-rose-500/10 text-rose-500 hover:bg-rose-500 hover:text-white" : "bg-rose-50 text-rose-500 hover:bg-rose-500 hover:text-white"
+                            )}
                             title="Rejeitar"
                           >
                             <Minus size={18} />
@@ -1917,7 +2294,10 @@ export default function App() {
                           <button 
                             onClick={() => setConfirmAction({ id: req.id, type: 'approve', email: req.email })}
                             disabled={isSubmitting}
-                            className="bg-emerald-500/10 hover:bg-emerald-500 text-emerald-500 hover:text-white p-2 rounded-xl transition-all"
+                            className={cn(
+                              "p-2 rounded-xl transition-all",
+                              theme === 'dark' ? "bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500 hover:text-white" : "bg-emerald-50 text-emerald-500 hover:bg-emerald-500 hover:text-white"
+                            )}
                             title="Aprovar"
                           >
                             <Plus size={18} />
@@ -1927,7 +2307,10 @@ export default function App() {
                       <button 
                         onClick={() => setConfirmAction({ id: req.id, type: 'delete', email: req.email })}
                         disabled={isSubmitting}
-                        className="bg-zinc-700/50 hover:bg-rose-500 text-zinc-400 hover:text-white p-2 rounded-xl transition-all"
+                        className={cn(
+                          "p-2 rounded-xl transition-all",
+                          theme === 'dark' ? "bg-zinc-700/50 text-zinc-400 hover:bg-rose-500 hover:text-white" : "bg-zinc-200 text-zinc-500 hover:bg-rose-500 hover:text-white"
+                        )}
                         title="Excluir"
                       >
                         <Trash2 size={18} />
@@ -1961,7 +2344,7 @@ export default function App() {
                     </div>
                     
                     <div>
-                      <h4 className="text-xl font-black uppercase tracking-tighter">
+                      <h4 className={cn("text-xl font-black uppercase tracking-tighter transition-colors duration-500", theme === 'dark' ? "text-white" : "text-white")}>
                         {confirmAction.type === 'approve' ? 'Confirmar Aprovação' : confirmAction.type === 'reject' ? 'Confirmar Rejeição' : 'Confirmar Exclusão'}
                       </h4>
                       <p className="text-zinc-400 text-sm mt-2">
@@ -1974,7 +2357,10 @@ export default function App() {
                     <div className="flex gap-3">
                       <button 
                         onClick={() => setConfirmAction(null)}
-                        className="flex-1 bg-zinc-800 hover:bg-zinc-700 py-3 rounded-xl font-bold transition-colors uppercase tracking-widest text-xs"
+                        className={cn(
+                          "flex-1 py-3 rounded-xl font-bold transition-all uppercase tracking-widest text-xs",
+                          theme === 'dark' ? "bg-zinc-800 hover:bg-zinc-700 text-white" : "bg-zinc-700 hover:bg-zinc-600 text-white"
+                        )}
                       >
                         Cancelar
                       </button>
@@ -1990,7 +2376,7 @@ export default function App() {
                           confirmAction.type === 'approve' ? "bg-emerald-600 hover:bg-emerald-500" : "bg-rose-600 hover:bg-rose-500"
                         )}
                       >
-                        {isSubmitting ? <Loader2 className="animate-spin" size={16} /> : 'Confirmar'}
+                        {isSubmitting ? <Loader2 className="animate-spin" size={16} /> : (isSuccess ? <Check size={16} className="text-emerald-400" /> : 'Confirmar')}
                       </button>
                     </div>
                   </motion.div>

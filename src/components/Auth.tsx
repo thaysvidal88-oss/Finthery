@@ -7,9 +7,10 @@ import { cn } from '../utils';
 interface AuthProps {
   onPasswordResetComplete?: () => void;
   isInitialResetMode?: boolean;
+  theme?: 'light' | 'dark';
 }
 
-const Logo = ({ size = 'md', showText = true, className }: { size?: 'sm' | 'md' | 'lg', showText?: boolean, className?: string }) => {
+const Logo = ({ size = 'md', showText = true, className, theme = 'dark' }: { size?: 'sm' | 'md' | 'lg', showText?: boolean, className?: string, theme?: 'light' | 'dark' }) => {
   const textSize = size === 'sm' ? 'text-sm' : size === 'md' ? 'text-5xl md:text-6xl' : 'text-8xl';
   
   // Planet body dimensions
@@ -26,45 +27,78 @@ const Logo = ({ size = 'md', showText = true, className }: { size?: 'sm' | 'md' 
         {/* Layer 1: Back Rings (Behind Planet) */}
         <div className="absolute z-0 pointer-events-none flex items-center justify-center" style={{ width: ringW, height: ringH }}>
           <div 
-            className="w-full h-full border border-purple-400/30 rounded-[100%] rotate-[-25deg] skew-x-[65deg]"
+            className={cn(
+              "w-full h-full border rounded-[100%] rotate-[-25deg] skew-x-[65deg]",
+              theme === 'dark' ? "border-purple-400/30" : "border-brand/40"
+            )}
             style={{ clipPath: 'inset(0 0 50% 0)' }}
           />
         </div>
 
         {/* Layer 2: Planet Body */}
-        <div className="absolute inset-0 rounded-full bg-[#05000a] shadow-[inset_-4px_-4px_10px_rgba(0,0,0,0.9),0_0_30px_rgba(168,85,247,0.3)] border border-purple-500/10 overflow-hidden z-10">
+        <div className={cn(
+          "absolute inset-0 rounded-full overflow-hidden z-10 border",
+          theme === 'dark' 
+            ? "bg-[#05000a] shadow-[inset_-4px_-4px_10px_rgba(0,0,0,0.9),0_0_30px_rgba(168,85,247,0.3)] border-purple-500/10" 
+            : "bg-white shadow-[inset_-4px_-4px_10px_rgba(0,0,0,0.1),0_0_20px_rgba(202,148,201,0.2)] border-brand/20"
+        )}>
           {/* Intense Crescent Glow */}
-          <div className="absolute inset-0 opacity-80 bg-[radial-gradient(circle_at_25%_35%,#d8b4fe,transparent_60%)]" />
-          <div className="absolute inset-0 opacity-40 bg-[radial-gradient(circle_at_25%_35%,#a855f7,transparent_80%)]" />
+          <div className={cn(
+            "absolute inset-0 opacity-80",
+            theme === 'dark' ? "bg-[radial-gradient(circle_at_25%_35%,#d8b4fe,transparent_60%)]" : "bg-[radial-gradient(circle_at_25%_35%,#E2B8E1,transparent_60%)]"
+          )} />
+          <div className={cn(
+            "absolute inset-0 opacity-40",
+            theme === 'dark' ? "bg-[radial-gradient(circle_at_25%_35%,#a855f7,transparent_80%)]" : "bg-[radial-gradient(circle_at_25%_35%,#CA94C9,transparent_80%)]"
+          )} />
           
           {/* Atmospheric Rim Light */}
-          <div className="absolute inset-0 rounded-full border-t border-l border-white/20 blur-[0.5px]" />
+          <div className={cn(
+            "absolute inset-0 rounded-full border-t border-l blur-[0.5px]",
+            theme === 'dark' ? "border-white/20" : "border-brand/40"
+          )} />
         </div>
 
         {/* Layer 3: Front Rings (In front of Planet) */}
         <div className="absolute z-20 pointer-events-none flex items-center justify-center" style={{ width: ringW, height: ringH }}>
           <div 
-            className="w-full h-full border-2 border-purple-300/50 rounded-[100%] rotate-[-25deg] skew-x-[65deg] shadow-[0_0_10px_rgba(192,132,252,0.4)]"
+            className={cn(
+              "w-full h-full border-2 rounded-[100%] rotate-[-25deg] skew-x-[65deg]",
+              theme === 'dark' ? "border-purple-300/50 shadow-[0_0_10px_rgba(192,132,252,0.4)]" : "border-brand/60 shadow-[0_0_10px_rgba(202,148,201,0.3)]"
+            )}
             style={{ clipPath: 'inset(50% 0 0 0)' }}
           />
         </div>
         
-        {/* Layer 4: Arrow - Smaller and more opaque/muted */}
+        {/* Layer 4: Arrow */}
         <div className="relative z-30 flex items-center justify-center">
           <TrendingUp 
             size={size === 'sm' ? 10 : size === 'md' ? 24 : 36} 
-            className="text-white/60 drop-shadow-[0_0_10px_rgba(192,132,252,0.4)] rotate-[-10deg]" 
+            className={cn(
+              "rotate-[-10deg]",
+              theme === 'dark' ? "text-white/60 drop-shadow-[0_0_10px_rgba(192,132,252,0.4)]" : "text-brand drop-shadow-[0_0_5px_rgba(202,148,201,0.4)]"
+            )}
             strokeWidth={2.5}
           />
         </div>
 
         {/* Sparkles */}
-        <div className="absolute -top-4 -left-4 w-1 h-1 bg-white rounded-full animate-pulse shadow-[0_0_8px_white]" />
-        <div className="absolute top-2 -right-6 w-1 h-1 bg-purple-200 rounded-full animate-pulse delay-150 shadow-[0_0_10px_rgba(192,132,252,1)]" />
+        <div className={cn(
+          "absolute -top-4 -left-4 w-1 h-1 rounded-full animate-pulse",
+          theme === 'dark' ? "bg-white shadow-[0_0_8px_white]" : "bg-brand shadow-[0_0_8px_rgba(202,148,201,0.8)]"
+        )} />
+        <div className={cn(
+          "absolute top-2 -right-6 w-1 h-1 rounded-full animate-pulse delay-150",
+          theme === 'dark' ? "bg-purple-200 shadow-[0_0_10px_rgba(192,132,252,1)]" : "bg-brand-light shadow-[0_0_10px_rgba(202,148,201,0.6)]"
+        )} />
       </div>
 
       {showText && (
-        <h1 className={cn("font-medium tracking-tight text-white drop-shadow-2xl font-jersey", textSize)}>
+        <h1 className={cn(
+          "font-medium tracking-tight drop-shadow-2xl font-jersey", 
+          textSize,
+          theme === 'dark' ? "text-white" : "text-zinc-900"
+        )}>
           Finthery
         </h1>
       )}
@@ -72,7 +106,7 @@ const Logo = ({ size = 'md', showText = true, className }: { size?: 'sm' | 'md' 
   );
 };
 
-export function Auth({ onPasswordResetComplete, isInitialResetMode }: AuthProps) {
+export function Auth({ onPasswordResetComplete, isInitialResetMode, theme = 'dark' }: AuthProps) {
   const [loading, setLoading] = useState(false);
   const [isSignUp, setIsSignUp] = useState(false);
   const [isResettingPassword, setIsResettingPassword] = useState(isInitialResetMode || false);
@@ -227,13 +261,19 @@ export function Auth({ onPasswordResetComplete, isInitialResetMode }: AuthProps)
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#1a0b1a] via-[#0f050f] to-black flex items-center justify-center p-4 relative overflow-hidden">
+    <div className={cn(
+      "min-h-screen flex items-center justify-center p-4 relative overflow-hidden transition-colors duration-500",
+      theme === 'dark' ? "bg-gradient-to-br from-[#1a0b1a] via-[#0f050f] to-black" : "bg-zinc-50"
+    )}>
       {/* Galaxy Sparkles Background */}
       <div className="absolute inset-0 pointer-events-none z-0">
         {[...Array(80)].map((_, i) => (
           <div 
             key={i}
-            className="absolute rounded-full bg-white opacity-10 animate-pulse"
+            className={cn(
+              "absolute rounded-full animate-pulse transition-opacity duration-1000",
+              theme === 'dark' ? "bg-white opacity-10" : "bg-brand/20 opacity-5"
+            )}
             style={{
               top: `${Math.random() * 100}%`,
               left: `${Math.random() * 100}%`,
@@ -241,22 +281,32 @@ export function Auth({ onPasswordResetComplete, isInitialResetMode }: AuthProps)
               height: `${1 + Math.random() * 2}px`,
               animationDelay: `${Math.random() * 5}s`,
               animationDuration: `${3 + Math.random() * 4}s`,
-              boxShadow: Math.random() > 0.8 ? '0 0 10px 1px rgba(192, 132, 252, 0.3)' : 'none'
+              boxShadow: theme === 'dark' && Math.random() > 0.8 ? '0 0 10px 1px rgba(192, 132, 252, 0.3)' : 'none'
             }}
           />
         ))}
-        <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-brand/5 rounded-full blur-[120px] animate-pulse" />
-        <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-purple-500/5 rounded-full blur-[120px] animate-pulse" />
+        {theme === 'dark' && (
+          <>
+            <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-brand/5 rounded-full blur-[120px] animate-pulse" />
+            <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-purple-500/5 rounded-full blur-[120px] animate-pulse" />
+          </>
+        )}
       </div>
 
       <motion.div 
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="w-full max-w-md bg-zinc-900/40 backdrop-blur-xl border border-white/10 rounded-3xl p-8 shadow-2xl relative z-10"
+        className={cn(
+          "w-full max-w-md backdrop-blur-xl border rounded-3xl p-8 shadow-2xl relative z-10 transition-all duration-500",
+          theme === 'dark' ? "bg-zinc-900/40 border-white/10" : "bg-white border-zinc-200"
+        )}
       >
         <div className="flex flex-col items-center mb-10">
-          <Logo size="md" className="mb-4" />
-          <p className="text-zinc-500 text-[10px] uppercase tracking-[0.3em] font-black bg-white/5 px-4 py-1 rounded-full border border-white/10">
+          <Logo size="md" className="mb-4" theme={theme} />
+          <p className={cn(
+            "text-[10px] uppercase tracking-[0.3em] font-black px-4 py-1 rounded-full border transition-colors duration-500",
+            theme === 'dark' ? "text-zinc-500 bg-white/5 border-white/10" : "text-zinc-400 bg-zinc-100 border-zinc-200"
+          )}>
             {isResettingPassword ? 'Definir Nova Senha' : isSignUp ? 'Crie sua conta' : 'Acesse sua conta'}
           </p>
         </div>
@@ -272,7 +322,10 @@ export function Auth({ onPasswordResetComplete, isInitialResetMode }: AuthProps)
                   type={showPassword ? "text" : "password"} 
                   value={password}
                   onChange={e => setPassword(e.target.value)}
-                  className="w-full bg-zinc-800 border border-zinc-700 rounded-xl pl-12 pr-12 py-3 focus:outline-none focus:border-brand transition-colors font-bold text-white"
+                  className={cn(
+                    "w-full border rounded-xl pl-12 pr-12 py-3 focus:outline-none focus:border-brand transition-all font-bold",
+                    theme === 'dark' ? "bg-zinc-800 border-zinc-700 text-white" : "bg-zinc-50 border-zinc-200 text-zinc-900"
+                  )}
                   placeholder="••••••••"
                 />
                 <button
@@ -324,7 +377,10 @@ export function Auth({ onPasswordResetComplete, isInitialResetMode }: AuthProps)
                   type="text" 
                   value={name}
                   onChange={e => setName(e.target.value)}
-                  className="w-full bg-zinc-800 border border-zinc-700 rounded-xl pl-12 pr-4 py-3 focus:outline-none focus:border-brand transition-colors font-bold text-white"
+                  className={cn(
+                    "w-full border rounded-xl pl-12 pr-4 py-3 focus:outline-none focus:border-brand transition-all font-bold",
+                    theme === 'dark' ? "bg-zinc-800 border-zinc-700 text-white" : "bg-zinc-50 border-zinc-200 text-zinc-900"
+                  )}
                   placeholder="Seu nome"
                 />
               </div>
@@ -339,7 +395,10 @@ export function Auth({ onPasswordResetComplete, isInitialResetMode }: AuthProps)
                 type="email" 
                 value={email}
                 onChange={e => setEmail(e.target.value)}
-                className="w-full bg-zinc-800 border border-zinc-700 rounded-xl pl-12 pr-4 py-3 focus:outline-none focus:border-brand transition-colors font-bold text-white"
+                className={cn(
+                  "w-full border rounded-xl pl-12 pr-4 py-3 focus:outline-none focus:border-brand transition-all font-bold",
+                  theme === 'dark' ? "bg-zinc-800 border-zinc-700 text-white" : "bg-zinc-50 border-zinc-200 text-zinc-900"
+                )}
                 placeholder="seu@email.com"
               />
             </div>
@@ -365,7 +424,10 @@ export function Auth({ onPasswordResetComplete, isInitialResetMode }: AuthProps)
                 type={showPassword ? "text" : "password"} 
                 value={password}
                 onChange={e => setPassword(e.target.value)}
-                className="w-full bg-zinc-800 border border-zinc-700 rounded-xl pl-12 pr-12 py-3 focus:outline-none focus:border-brand transition-colors font-bold text-white"
+                className={cn(
+                  "w-full border rounded-xl pl-12 pr-12 py-3 focus:outline-none focus:border-brand transition-all font-bold",
+                  theme === 'dark' ? "bg-zinc-800 border-zinc-700 text-white" : "bg-zinc-50 border-zinc-200 text-zinc-900"
+                )}
                 placeholder="••••••••"
               />
               <button
@@ -411,7 +473,10 @@ export function Auth({ onPasswordResetComplete, isInitialResetMode }: AuthProps)
               type="button"
               onClick={handleRequestAccess}
               disabled={loading}
-              className="w-full bg-zinc-800 hover:bg-zinc-700 text-white py-4 rounded-xl font-bold transition-all uppercase tracking-widest text-xs flex items-center justify-center gap-2"
+              className={cn(
+                "w-full py-4 rounded-xl font-bold transition-all uppercase tracking-widest text-xs flex items-center justify-center gap-2",
+                theme === 'dark' ? "bg-zinc-800 hover:bg-zinc-700 text-white" : "bg-zinc-100 hover:bg-zinc-200 text-zinc-600"
+              )}
             >
               {loading ? <Loader2 className="animate-spin" size={16} /> : 'Solicitar Acesso ao Administrador'}
             </button>
