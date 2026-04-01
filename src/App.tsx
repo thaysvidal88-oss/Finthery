@@ -879,13 +879,29 @@ export default function App() {
     setTransactions(transactions.filter(t => t.id !== id));
   };
 
-  const deleteCard = (cardName: string) => {
-    setTransactions(transactions.map(t => {
-      if (t.cardName === cardName) {
-        return { ...t, cardName: undefined, cardColor: undefined, paymentMethod: 'Dinheiro' };
-      }
-      return t;
-    }));
+  const deleteCard = async (cardName: string) => {
+    if (!supabase || !session) return;
+    
+    try {
+      const { error } = await supabase
+        .from('transactions')
+        .update({ card_name: null, card_color: null, payment_method: 'Dinheiro' })
+        .eq('card_name', cardName)
+        .eq('user_id', session.user.id);
+
+      if (error) throw error;
+
+      setTransactions(transactions.map(t => {
+        if (t.cardName === cardName) {
+          return { ...t, cardName: undefined, cardColor: undefined, paymentMethod: 'Dinheiro' };
+        }
+        return t;
+      }));
+      toast.success(`Cartão ${cardName} excluído com sucesso!`);
+    } catch (error) {
+      console.error('Erro ao excluir cartão:', error);
+      toast.error('Erro ao excluir cartão no banco de dados.');
+    }
   };
 
   const handleAddGoal = async (e: React.FormEvent) => {
@@ -1228,10 +1244,10 @@ export default function App() {
       {/* Header with Gradient */}
       {/* Header Section with Galaxy Effect */}
       <div className={cn(
-        "relative overflow-hidden pt-12 pb-20 px-4 md:px-8 border-b z-10 transition-colors duration-500",
+        "relative overflow-hidden pt-12 pb-20 border-b z-10 transition-colors duration-500",
         theme === 'dark' ? "border-zinc-800/50" : "border-zinc-200"
       )}>
-        <header className="max-w-6xl mx-auto flex flex-col md:flex-row justify-between items-center gap-8 relative z-20">
+        <header className="max-w-6xl mx-auto px-4 md:px-8 flex flex-col md:flex-row justify-between items-center gap-8 relative z-20">
           <div className="flex flex-col md:flex-row items-center gap-8">
             <Logo size="md" theme={theme} />
             <div className={cn(
