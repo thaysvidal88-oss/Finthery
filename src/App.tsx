@@ -1247,7 +1247,7 @@ export default function App() {
         "relative overflow-hidden pt-12 pb-20 border-b z-10 transition-colors duration-500",
         theme === 'dark' ? "border-zinc-800/50" : "border-zinc-200"
       )}>
-        <header className="max-w-6xl mx-auto px-4 md:px-8 flex flex-col md:flex-row justify-between items-center gap-8 relative z-20">
+        <header className="w-full max-w-6xl mx-auto px-4 md:px-8 flex flex-col md:flex-row justify-between items-center gap-8 relative z-20">
           <div className="flex flex-col md:flex-row items-center gap-8">
             <Logo size="md" theme={theme} />
             <div className={cn(
@@ -1375,7 +1375,7 @@ export default function App() {
       </header>
     </div>
 
-      <main className="max-w-6xl mx-auto p-4 md:p-8 grid grid-cols-1 lg:grid-cols-3 gap-8 -mt-8 relative z-20">
+      <main className="w-full max-w-6xl mx-auto px-4 md:px-8 py-4 md:py-8 grid grid-cols-1 lg:grid-cols-3 gap-8 -mt-8 relative z-20">
         {/* Left Column: Summary & Charts */}
         <div className="lg:col-span-2 space-y-8">
           {/* Cards Summary */}
