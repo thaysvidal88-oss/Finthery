@@ -24,12 +24,13 @@ import {
   Moon,
   Sparkles,
   Rocket,
-  Brain,
   Repeat,
   Bell,
-  Triangle
+  Triangle,
+  Download
 } from 'lucide-react';
-import { GoogleGenAI } from "@google/genai";
+import { jsPDF } from "jspdf";
+import autoTable from "jspdf-autotable";
 import { Toaster, toast } from 'sonner';
 import { 
   PieChart, 
@@ -204,9 +205,6 @@ export default function App() {
   const [goals, setGoals] = useState<Goal[]>([]);
   const [investments, setInvestments] = useState<Investment[]>([]);
   const [billReminders, setBillReminders] = useState<BillReminder[]>([]);
-  const [isAiLoading, setIsAiLoading] = useState(false);
-  const [aiInsight, setAiInsight] = useState<string | null>(null);
-  const [showAiModal, setShowAiModal] = useState(false);
   const [showIndependenceModal, setShowIndependenceModal] = useState(false);
   const [showCalendarModal, setShowCalendarModal] = useState(false);
   const [isRecurring, setIsRecurring] = useState(false);
@@ -344,50 +342,6 @@ export default function App() {
     }
   };
 
-  const fetchAiInsights = async () => {
-    if (!session) return;
-    setIsAiLoading(true);
-    setAiInsight(null);
-    setShowAiModal(true);
-
-    try {
-      if (!navigator.onLine) {
-        setAiInsight("Parece que você está sem conexão com a rede estelar. Verifique seu Wi-Fi ou dados móveis para consultar o Oráculo.");
-        return;
-      }
-
-      const apiKey = process.env.GEMINI_API_KEY;
-      if (!apiKey) {
-        setAiInsight("O Oráculo está em silêncio profundo (chave de acesso não encontrada). Verifique as configurações do sistema.");
-        return;
-      }
-
-      const ai = new GoogleGenAI({ apiKey });
-      const model = ai.models.generateContent({
-        model: "gemini-3-flash-preview",
-        contents: `Analise meu histórico financeiro e dê dicas personalizadas com um tema galáctico/cósmico.
-        
-        Transações: ${JSON.stringify(currentMonthTransactions.map(t => ({ desc: t.description, amount: t.amount, type: t.type, cat: t.category })))}
-        Metas: ${JSON.stringify(goals.map(g => ({ title: g.title, target: g.targetAmount, current: g.currentAmount })))}
-        Investimentos: ${JSON.stringify(investments.map(i => ({ desc: i.description, amount: i.amount })))}
-        
-        Dê um insight curto e motivador, como um "Oráculo Cósmico". Use emojis espaciais.`,
-      });
-
-      const response = await model;
-      setAiInsight(response.text || "As estrelas estão nubladas hoje. Tente novamente mais tarde.");
-    } catch (error) {
-      console.error("Erro ao consultar o Oráculo:", error);
-      if (!navigator.onLine) {
-        setAiInsight("Conexão perdida com o vácuo. Verifique sua internet.");
-      } else {
-        setAiInsight("Houve uma interferência nas comunicações intergalácticas. Verifique sua conexão com o vácuo.");
-      }
-    } finally {
-      setIsAiLoading(false);
-    }
-  };
-
   const calculateFinancialIndependence = () => {
     const totalInvested = investments.reduce((sum, i) => sum + i.amount, 0);
     const monthlyContribution = investments.filter(i => i.type === 'monthly').reduce((sum, i) => sum + i.amount, 0);
@@ -399,6 +353,176 @@ export default function App() {
     const years = monthlyContribution > 0 ? remaining / (monthlyContribution * 12) : Infinity;
 
     return { targetAmount, remaining, years };
+  };
+
+  const exportToPdf = (period: 'month' | 'year') => {
+    const doc = new jsPDF();
+    const now = new Date();
+    const title = period === 'month' 
+      ? format(currentDate, 'MMMM yyyy', { locale: ptBR }).toUpperCase()
+      : `ANO ${currentDate.getFullYear()}`;
+
+    const filteredTransactions = transactions.filter(t => {
+      const tDate = parseISO(t.date);
+      if (period === 'month') {
+        return isSameMonth(tDate, currentDate);
+      } else {
+        return tDate.getFullYear() === currentDate.getFullYear();
+      }
+    }).sort((a, b) => parseISO(b.date).getTime() - parseISO(a.date).getTime());
+
+    if (filteredTransactions.length === 0) {
+      toast.error("Nenhuma transação encontrada para este período.");
+      return;
+    }
+
+    const totalIncome = filteredTransactions
+      .filter(t => t.type === 'income')
+      .reduce((sum, t) => sum + t.amount, 0);
+    
+    const totalExpense = filteredTransactions
+      .filter(t => t.type === 'expense')
+      .reduce((sum, t) => sum + t.amount, 0);
+
+    const balance = totalIncome - totalExpense;
+
+    // Category Breakdown for Visual Section
+    const categoryTotals: Record<string, number> = {};
+    filteredTransactions
+      .filter(t => t.type === 'expense')
+      .forEach(t => {
+        categoryTotals[t.category] = (categoryTotals[t.category] || 0) + t.amount;
+      });
+
+    const sortedCategories = Object.entries(categoryTotals)
+      .sort(([, a], [, b]) => b - a)
+      .slice(0, 5); // Top 5 categories
+
+    // --- PDF HEADER ---
+    // Brand Logo (Simple Planet Shape)
+    doc.setDrawColor(202, 148, 201);
+    doc.setLineWidth(1);
+    doc.circle(22, 22, 8, 'S'); // Planet outline
+    doc.line(12, 22, 32, 22);   // Planet ring
+    
+    doc.setFontSize(22);
+    doc.setTextColor(202, 148, 201); // Brand color #CA94C9
+    doc.setFont("helvetica", "bold");
+    doc.text("FINANÇAS GALÁCTICAS", 35, 24);
+    
+    doc.setFontSize(10);
+    doc.setTextColor(100);
+    doc.setFont("helvetica", "normal");
+    doc.text(`RELATÓRIO FINANCEIRO | ${title}`, 35, 30);
+    doc.text(`Gerado em: ${format(now, "dd/MM/yyyy HH:mm")}`, 145, 30);
+
+    // --- SUMMARY CARDS ---
+    const cardWidth = 60;
+    const cardHeight = 25;
+    const startY = 45;
+
+    // Income Card
+    doc.setFillColor(240, 253, 244); // Light green
+    doc.roundedRect(14, startY, cardWidth, cardHeight, 3, 3, 'F');
+    doc.setFontSize(8);
+    doc.setTextColor(21, 128, 61);
+    doc.text("TOTAL RECEITAS", 19, startY + 8);
+    doc.setFontSize(12);
+    doc.setFont("helvetica", "bold");
+    doc.text(formatCurrency(totalIncome), 19, startY + 18);
+
+    // Expense Card
+    doc.setFillColor(255, 241, 242); // Light red
+    doc.roundedRect(14 + cardWidth + 8, startY, cardWidth, cardHeight, 3, 3, 'F');
+    doc.setFontSize(8);
+    doc.setTextColor(190, 18, 60);
+    doc.setFont("helvetica", "normal");
+    doc.text("TOTAL DESPESAS", 19 + cardWidth + 8, startY + 8);
+    doc.setFontSize(12);
+    doc.setFont("helvetica", "bold");
+    doc.text(formatCurrency(totalExpense), 19 + cardWidth + 8, startY + 18);
+
+    // Balance Card
+    doc.setFillColor(245, 243, 255); // Light purple
+    doc.roundedRect(14 + (cardWidth + 8) * 2, startY, cardWidth, cardHeight, 3, 3, 'F');
+    doc.setFontSize(8);
+    doc.setTextColor(109, 40, 217);
+    doc.setFont("helvetica", "normal");
+    doc.text("SALDO FINAL", 19 + (cardWidth + 8) * 2, startY + 8);
+    doc.setFontSize(12);
+    doc.setFont("helvetica", "bold");
+    doc.text(formatCurrency(balance), 19 + (cardWidth + 8) * 2, startY + 18);
+
+    // --- CATEGORY CHART (VISUAL BARS) ---
+    doc.setFontSize(10);
+    doc.setTextColor(100);
+    doc.setFont("helvetica", "bold");
+    doc.text("PRINCIPAIS GASTOS POR CATEGORIA", 14, 85);
+
+    let barY = 95;
+    const maxBarWidth = 100;
+    const topCategoryAmount = sortedCategories[0]?.[1] || 1;
+
+    sortedCategories.forEach(([cat, amount]) => {
+      const barWidth = (amount / topCategoryAmount) * maxBarWidth;
+      
+      doc.setFontSize(8);
+      doc.setTextColor(80);
+      doc.setFont("helvetica", "normal");
+      doc.text(cat, 14, barY + 4);
+      
+      // Bar background
+      doc.setFillColor(240, 240, 240);
+      doc.roundedRect(50, barY, maxBarWidth, 5, 1, 1, 'F');
+      
+      // Active bar
+      doc.setFillColor(202, 148, 201);
+      doc.roundedRect(50, barY, barWidth, 5, 1, 1, 'F');
+      
+      doc.text(formatCurrency(amount), 155, barY + 4);
+      barY += 10;
+    });
+
+    // --- TRANSACTIONS TABLE ---
+    autoTable(doc, {
+      startY: barY + 10,
+      head: [['DATA', 'DESCRIÇÃO', 'CATEGORIA', 'TIPO', 'VALOR']],
+      body: filteredTransactions.map(t => [
+        format(parseISO(t.date), 'dd/MM/yyyy'),
+        t.description.toUpperCase(),
+        t.category.toUpperCase(),
+        t.type === 'income' ? 'RECEITA' : 'DESPESA',
+        formatCurrency(t.amount)
+      ]),
+      headStyles: { 
+        fillColor: [202, 148, 201], 
+        textColor: [255, 255, 255], 
+        fontStyle: 'bold',
+        fontSize: 8
+      },
+      alternateRowStyles: { fillColor: [250, 250, 250] },
+      styles: { fontSize: 8, cellPadding: 3 },
+      columnStyles: {
+        4: { halign: 'right', fontStyle: 'bold' }
+      }
+    });
+
+    // Footer
+    const pageCount = doc.internal.pages.length - 1;
+    for (let i = 1; i <= pageCount; i++) {
+      doc.setPage(i);
+      doc.setFontSize(8);
+      doc.setTextColor(150);
+      doc.text(
+        `Finanças Galácticas | Página ${i} de ${pageCount} | ${title}`,
+        doc.internal.pageSize.getWidth() / 2,
+        doc.internal.pageSize.getHeight() - 10,
+        { align: 'center' }
+      );
+    }
+
+    doc.save(`Relatorio_${period}_${format(now, 'yyyyMMdd_HHmm')}.pdf`);
+    toast.success("Relatório aprimorado com sucesso! 🚀");
   };
 
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -2028,12 +2152,6 @@ export default function App() {
               <h5 className="font-bold text-brand flex items-center gap-2 uppercase tracking-widest text-xs">
                 💡 Dica do Mês
               </h5>
-              <button 
-                onClick={fetchAiInsights}
-                className="flex items-center gap-2 bg-brand text-white px-3 py-1.5 rounded-xl text-[10px] font-bold uppercase tracking-widest hover:scale-105 transition-all shadow-[0_0_15px_rgba(202,148,201,0.5)]"
-              >
-                <Brain size={14} /> Oráculo Cósmico
-              </button>
             </div>
             <p className={cn(
               "text-sm leading-relaxed italic transition-colors duration-500",
@@ -2082,6 +2200,57 @@ export default function App() {
               </div>
               <span className="text-[10px] font-black uppercase tracking-widest text-center">Calendário Galáctico</span>
             </button>
+          </div>
+
+          {/* Export Reports Section */}
+          <div className="mt-12 mb-8">
+            <div className={cn(
+              "p-8 rounded-[2.5rem] border transition-all duration-500 relative overflow-hidden",
+              theme === 'dark' ? "bg-zinc-900 border-zinc-800" : "bg-white border-zinc-200"
+            )}>
+              {/* Galaxy Background Effect */}
+              <div className="absolute inset-0 pointer-events-none opacity-10">
+                <div className="absolute -top-24 -right-24 w-64 h-64 bg-brand rounded-full blur-[100px]" />
+              </div>
+
+              <div className="relative z-10">
+                <div className="flex items-center gap-4 mb-6">
+                  <div className="bg-brand/20 p-4 rounded-2xl">
+                    <Logo size="sm" showText={false} />
+                  </div>
+                  <div>
+                    <h4 className={cn("text-lg font-black uppercase tracking-tighter", theme === 'dark' ? "text-white" : "text-zinc-900")}>
+                      Relatórios Estelares
+                    </h4>
+                    <p className="text-zinc-500 text-[10px] font-bold uppercase tracking-widest">Exporte sua jornada financeira</p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <button 
+                    onClick={() => exportToPdf('month')}
+                    className="flex items-center justify-between gap-4 bg-brand/10 hover:bg-brand/20 border border-brand/20 p-5 rounded-2xl transition-all group"
+                  >
+                    <div className="flex items-center gap-3">
+                      <Calendar className="text-brand" size={20} />
+                      <span className={cn("text-[10px] font-black uppercase tracking-widest", theme === 'dark' ? "text-zinc-300" : "text-zinc-700")}>Resumo Mensal</span>
+                    </div>
+                    <Download className="text-brand group-hover:translate-y-0.5 transition-transform" size={18} />
+                  </button>
+
+                  <button 
+                    onClick={() => exportToPdf('year')}
+                    className="flex items-center justify-between gap-4 bg-brand/10 hover:bg-brand/20 border border-brand/20 p-5 rounded-2xl transition-all group"
+                  >
+                    <div className="flex items-center gap-3">
+                      <TrendingUp className="text-brand" size={20} />
+                      <span className={cn("text-[10px] font-black uppercase tracking-widest", theme === 'dark' ? "text-zinc-300" : "text-zinc-700")}>Resumo Anual</span>
+                    </div>
+                    <Download className="text-brand group-hover:translate-y-0.5 transition-transform" size={18} />
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </main>
@@ -2458,68 +2627,6 @@ export default function App() {
           </div>
         </div>
       )}
-
-      {/* AI Insights Modal */}
-      <AnimatePresence>
-        {showAiModal && (
-          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-[60]">
-            <motion.div 
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-              className={cn(
-                "border w-full max-w-lg rounded-3xl p-8 shadow-2xl relative overflow-hidden",
-                theme === 'dark' ? "bg-zinc-900 border-zinc-800" : "bg-white border-zinc-200"
-              )}
-            >
-              {/* Galaxy Background Effect */}
-              <div className="absolute inset-0 pointer-events-none opacity-20">
-                <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_50%_50%,#a855f7_0%,transparent_70%)] blur-3xl" />
-              </div>
-
-              <div className="relative z-10">
-                <div className="flex justify-between items-center mb-6">
-                  <h3 className="text-2xl font-black flex items-center gap-3 uppercase tracking-tighter">
-                    <Brain className="text-brand animate-pulse" size={32} /> Oráculo Cósmico
-                  </h3>
-                  <button onClick={() => setShowAiModal(false)} className="text-zinc-500 hover:text-white transition-colors">
-                    <Plus className="rotate-45" size={24} />
-                  </button>
-                </div>
-
-                <div className={cn(
-                  "min-h-[200px] flex flex-col items-center justify-center text-center p-6 rounded-2xl border border-dashed",
-                  theme === 'dark' ? "bg-zinc-800/30 border-zinc-700" : "bg-zinc-50 border-zinc-200"
-                )}>
-                  {isAiLoading ? (
-                    <div className="space-y-4">
-                      <Loader2 className="animate-spin text-brand mx-auto" size={48} />
-                      <p className="text-zinc-500 italic animate-pulse">Consultando as estrelas...</p>
-                    </div>
-                  ) : (
-                    <div className="space-y-4">
-                      <Sparkles className="text-brand mx-auto" size={32} />
-                      <p className={cn(
-                        "text-lg leading-relaxed font-medium italic",
-                        theme === 'dark' ? "text-zinc-200" : "text-zinc-800"
-                      )}>
-                        "{aiInsight}"
-                      </p>
-                    </div>
-                  )}
-                </div>
-
-                <button 
-                  onClick={() => setShowAiModal(false)}
-                  className="w-full mt-6 bg-brand hover:bg-brand-dark text-white font-black py-4 rounded-2xl transition-all uppercase tracking-widest text-xs shadow-lg shadow-brand/20"
-                >
-                  Entendido, Mestre
-                </button>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
 
       {/* Financial Independence Modal */}
       <AnimatePresence>
