@@ -71,12 +71,13 @@ import { Session } from '@supabase/supabase-js';
 
 const PAYMENT_METHODS: PaymentMethod[] = ['Dinheiro', 'Cartão de Crédito', 'Cartão de Débito', 'Pix', 'Boleto'];
 const CARD_COLORS = [
-  { name: 'Roxo', value: 'from-purple-600 to-purple-900' },
-  { name: 'Azul', value: 'from-blue-600 to-blue-900' },
-  { name: 'Verde', value: 'from-emerald-600 to-emerald-900' },
-  { name: 'Rosa', value: 'from-rose-600 to-rose-900' },
-  { name: 'Laranja', value: 'from-orange-600 to-orange-900' },
-  { name: 'Brand', value: 'from-brand-dark to-brand' },
+  { name: 'Roxo', value: '#C084FC' },
+  { name: 'Azul', value: '#60A5FA' },
+  { name: 'Verde', value: '#34D399' },
+  { name: 'Rosa', value: '#F472B6' },
+  { name: 'Laranja', value: '#FB923C' },
+  { name: 'Cinza', value: '#94A3B8' },
+  { name: 'Brand', value: '#CA94C9' },
 ];
 
 const Logo = ({ size = 'md', showText = true, className, theme = 'dark' }: { size?: 'sm' | 'md' | 'lg', showText?: boolean, className?: string, theme?: 'light' | 'dark' }) => {
@@ -90,7 +91,7 @@ const Logo = ({ size = 'md', showText = true, className, theme = 'dark' }: { siz
   const ringH = size === 'sm' ? 12 : size === 'md' ? 28 : 40;
 
   return (
-    <div className={cn("flex items-center gap-6", className)}>
+    <div className={cn("flex items-center", showText ? "gap-2 sm:gap-6" : "gap-0", className)}>
       <div className={cn("relative flex items-center justify-center", planetDim)}>
         
         {/* Layer 1: Back Rings (Behind Planet) */}
@@ -153,11 +154,11 @@ const Logo = ({ size = 'md', showText = true, className, theme = 'dark' }: { siz
 
         {/* Sparkles */}
         <div className={cn(
-          "absolute -top-4 -left-4 w-1 h-1 rounded-full animate-pulse",
+          "absolute -top-2 -left-2 w-0.5 h-0.5 rounded-full animate-pulse",
           theme === 'dark' ? "bg-white shadow-[0_0_8px_white]" : "bg-brand shadow-[0_0_8px_rgba(202,148,201,0.8)]"
         )} />
         <div className={cn(
-          "absolute top-2 -right-6 w-1 h-1 rounded-full animate-pulse delay-150",
+          "absolute top-1 -right-2 w-0.5 h-0.5 rounded-full animate-pulse delay-150",
           theme === 'dark' ? "bg-purple-200 shadow-[0_0_10px_rgba(192,132,252,1)]" : "bg-brand-light shadow-[0_0_10px_rgba(202,148,201,0.6)]"
         )} />
       </div>
@@ -350,7 +351,18 @@ export default function App() {
     setShowAiModal(true);
 
     try {
-      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
+      if (!navigator.onLine) {
+        setAiInsight("Parece que você está sem conexão com a rede estelar. Verifique seu Wi-Fi ou dados móveis para consultar o Oráculo.");
+        return;
+      }
+
+      const apiKey = process.env.GEMINI_API_KEY;
+      if (!apiKey) {
+        setAiInsight("O Oráculo está em silêncio profundo (chave de acesso não encontrada). Verifique as configurações do sistema.");
+        return;
+      }
+
+      const ai = new GoogleGenAI({ apiKey });
       const model = ai.models.generateContent({
         model: "gemini-3-flash-preview",
         contents: `Analise meu histórico financeiro e dê dicas personalizadas com um tema galáctico/cósmico.
@@ -366,7 +378,11 @@ export default function App() {
       setAiInsight(response.text || "As estrelas estão nubladas hoje. Tente novamente mais tarde.");
     } catch (error) {
       console.error("Erro ao consultar o Oráculo:", error);
-      setAiInsight("Houve uma interferência nas comunicações intergalácticas. Verifique sua conexão com o vácuo.");
+      if (!navigator.onLine) {
+        setAiInsight("Conexão perdida com o vácuo. Verifique sua internet.");
+      } else {
+        setAiInsight("Houve uma interferência nas comunicações intergalácticas. Verifique sua conexão com o vácuo.");
+      }
     } finally {
       setIsAiLoading(false);
     }
@@ -476,8 +492,8 @@ export default function App() {
           const mappedGoals: Goal[] = goalsData.map((g: any) => ({
             id: g.id,
             title: g.title,
-            targetAmount: g.target_amount,
-            currentAmount: g.current_amount,
+            targetAmount: g.targetAmount || g.target_amount,
+            currentAmount: g.currentAmount || g.current_amount,
             deadline: g.deadline,
             type: g.type,
             color: g.color,
@@ -490,7 +506,7 @@ export default function App() {
             id: i.id,
             description: i.description,
             amount: i.amount,
-            targetAmount: i.target_amount,
+            targetAmount: i.targetAmount || i.target_amount,
             date: i.date,
             type: i.type,
             color: i.color,
@@ -894,8 +910,8 @@ export default function App() {
         const { error } = await supabase.from('goals').insert({
           id: newGoal.id,
           title: newGoal.title,
-          target_amount: newGoal.targetAmount,
-          current_amount: newGoal.currentAmount,
+          targetAmount: newGoal.targetAmount,
+          currentAmount: newGoal.currentAmount,
           deadline: newGoal.deadline,
           type: newGoal.type,
           color: newGoal.color,
@@ -928,7 +944,7 @@ export default function App() {
 
   const updateGoalAmount = async (id: string, amount: number) => {
     if (session) {
-      const { error } = await supabase.from('goals').update({ current_amount: amount }).eq('id', id);
+      const { error } = await supabase.from('goals').update({ currentAmount: amount }).eq('id', id);
       if (error) {
         console.error('Error updating goal:', error);
         return;
@@ -970,7 +986,7 @@ export default function App() {
         const dbInvestment = {
           description: investmentDescription,
           amount: parseFloat(investmentAmount),
-          target_amount: investmentTargetAmount ? parseFloat(investmentTargetAmount) : undefined,
+          targetAmount: investmentTargetAmount ? parseFloat(investmentTargetAmount) : undefined,
           date: investmentDate,
           type: investmentType,
           color: investmentColor
@@ -1011,7 +1027,7 @@ export default function App() {
             id: newInvestment.id,
             description: newInvestment.description,
             amount: newInvestment.amount,
-            target_amount: newInvestment.targetAmount,
+            targetAmount: newInvestment.targetAmount,
             date: newInvestment.date,
             type: newInvestment.type,
             color: newInvestment.color,
@@ -1482,14 +1498,24 @@ export default function App() {
               </h4>
               <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-custom">
                 {cardTotals.map((card, idx) => (
-                  <div key={idx} className={cn(
-                    "min-w-[280px] h-44 rounded-2xl p-6 flex flex-col justify-between shadow-2xl shadow-brand/10 relative overflow-hidden bg-gradient-to-br",
-                    card.color
-                  )}>
+                  <div 
+                    key={idx} 
+                    className={cn(
+                      "min-w-[280px] h-44 rounded-3xl p-6 flex flex-col justify-between shadow-2xl shadow-brand/10 relative overflow-hidden backdrop-blur-xl border",
+                      theme === 'dark' ? "border-white/10" : "border-zinc-200/50",
+                      !card.color.startsWith('#') && "bg-gradient-to-br " + card.color
+                    )}
+                    style={card.color.startsWith('#') ? {
+                      background: `linear-gradient(135deg, ${card.color}99 0%, ${card.color}1a 100%)`
+                    } : {}}
+                  >
                     <div className="absolute -right-8 -top-8 w-32 h-32 bg-white/10 rounded-full blur-2xl" />
                     <div className="flex justify-between items-start">
-                      <div className="bg-white/20 p-2 rounded-lg backdrop-blur-md">
-                        <CreditCard size={24} className="text-white" />
+                      <div className={cn(
+                        "p-2 rounded-xl backdrop-blur-md",
+                        theme === 'dark' ? "bg-white/10" : "bg-zinc-900/10"
+                      )}>
+                        <CreditCard size={24} className={theme === 'dark' ? "text-white" : "text-zinc-900"} />
                       </div>
                       <div className="flex items-center gap-2">
                         <button 
@@ -1497,17 +1523,32 @@ export default function App() {
                             e.stopPropagation();
                             deleteCard(card.name);
                           }}
-                          className="text-white/60 hover:text-white transition-colors p-2 bg-white/10 rounded-lg backdrop-blur-md"
+                          className={cn(
+                            "transition-colors p-2 rounded-xl backdrop-blur-md",
+                            theme === 'dark' ? "text-white/60 hover:text-white bg-white/10" : "text-zinc-900/60 hover:text-zinc-900 bg-zinc-900/10"
+                          )}
                         >
                           <Trash2 size={18} />
                         </button>
-                        <span className="font-black text-white/50 italic text-xl">VISA</span>
+                        <span className={cn(
+                          "font-black italic text-xl",
+                          theme === 'dark' ? "text-white/50" : "text-zinc-900/30"
+                        )}>VISA</span>
                       </div>
                     </div>
                     <div>
-                      <p className="text-white/60 text-xs uppercase tracking-widest mb-1">{card.name}</p>
-                      <p className="text-2xl font-black text-white">{formatCurrency(card.total)}</p>
-                      <p className="text-[10px] text-white/40 mt-1 uppercase tracking-tighter">Gasto no mês atual</p>
+                      <p className={cn(
+                        "text-xs uppercase tracking-widest mb-1",
+                        theme === 'dark' ? "text-white/60" : "text-zinc-900/60"
+                      )}>{card.name}</p>
+                      <p className={cn(
+                        "text-2xl font-black",
+                        theme === 'dark' ? "text-white" : "text-zinc-900"
+                      )}>{formatCurrency(card.total)}</p>
+                      <p className={cn(
+                        "text-[10px] mt-1 uppercase tracking-tighter",
+                        theme === 'dark' ? "text-white/40" : "text-zinc-900/40"
+                      )}>Gasto no mês atual</p>
                     </div>
                   </div>
                 ))}
@@ -2316,12 +2357,13 @@ export default function App() {
                               type="button"
                               onClick={() => setCardColor(color.value)}
                               className={cn(
-                                "w-8 h-8 rounded-full bg-gradient-to-br border-2 transition-all",
-                                color.value,
+                                "w-8 h-8 rounded-full border-2 transition-all",
+                                !color.value.startsWith('#') && "bg-gradient-to-br " + color.value,
                                 cardColor === color.value 
                                   ? (theme === 'dark' ? "border-white scale-110" : "border-zinc-900 scale-110") 
                                   : "border-transparent opacity-60 hover:opacity-100"
                               )}
+                              style={color.value.startsWith('#') ? { backgroundColor: color.value } : {}}
                             />
                           ))}
                         </div>
@@ -2545,7 +2587,7 @@ export default function App() {
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.9, opacity: 0 }}
               className={cn(
-                "border w-full max-w-4xl rounded-3xl p-8 shadow-2xl transition-all duration-500 overflow-y-auto max-h-[90vh] relative",
+                "border w-full max-w-4xl rounded-3xl p-4 sm:p-8 shadow-2xl transition-all duration-500 overflow-y-auto max-h-[90vh] relative",
                 theme === 'dark' ? "bg-zinc-900 border-zinc-800" : "bg-white border-zinc-200"
               )}
             >
@@ -2554,29 +2596,29 @@ export default function App() {
                 <div className="absolute top-[-20%] left-[-20%] w-[140%] h-[140%] bg-[radial-gradient(circle_at_50%_50%,#CA94C9_0%,transparent_70%)]" />
               </div>
 
-              <div className="flex justify-between items-center mb-6 relative z-10">
-                <h3 className="text-2xl font-black flex items-center gap-3 uppercase tracking-tighter">
-                  <Calendar className="text-brand" size={32} /> Calendário Galáctico
+              <div className="flex flex-col sm:flex-row justify-between items-center gap-4 mb-6 relative z-10">
+                <h3 className="text-xl sm:text-2xl font-black flex items-center gap-3 uppercase tracking-tighter">
+                  <Calendar className="text-brand" size={24} /> Calendário Galáctico
                 </h3>
-                <div className="flex items-center gap-4">
-                  <div className="flex items-center gap-2 bg-zinc-800/50 p-1 rounded-xl border border-zinc-700">
+                <div className="flex items-center gap-2 sm:gap-4 w-full sm:w-auto justify-between sm:justify-end">
+                  <div className="flex items-center gap-1 sm:gap-2 bg-zinc-800/50 p-1 rounded-xl border border-zinc-700">
                     <button 
                       onClick={() => setCalendarDate(subMonths(calendarDate, 1))}
-                      className="p-2 hover:bg-zinc-700 rounded-lg transition-all text-zinc-400 hover:text-white"
+                      className="p-1.5 sm:p-2 hover:bg-zinc-700 rounded-lg transition-all text-zinc-400 hover:text-white"
                     >
-                      <ChevronLeft size={20} />
+                      <ChevronLeft size={18} />
                     </button>
-                    <span className="text-sm font-black uppercase tracking-widest px-2 min-w-[120px] text-center">
+                    <span className="text-[10px] sm:text-sm font-black uppercase tracking-widest px-1 sm:px-2 min-w-[100px] sm:min-w-[120px] text-center">
                       {format(calendarDate, 'MMMM yyyy', { locale: ptBR })}
                     </span>
                     <button 
                       onClick={() => setCalendarDate(addMonths(calendarDate, 1))}
-                      className="p-2 hover:bg-zinc-700 rounded-lg transition-all text-zinc-400 hover:text-white"
+                      className="p-1.5 sm:p-2 hover:bg-zinc-700 rounded-lg transition-all text-zinc-400 hover:text-white"
                     >
-                      <ChevronRight size={20} />
+                      <ChevronRight size={18} />
                     </button>
                   </div>
-                  <button onClick={() => setShowCalendarModal(false)} className="text-zinc-500 hover:text-white transition-colors">
+                  <button onClick={() => setShowCalendarModal(false)} className="text-zinc-500 hover:text-white transition-colors p-1">
                     <Plus className="rotate-45" size={24} />
                   </button>
                 </div>
@@ -2585,9 +2627,9 @@ export default function App() {
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                 {/* Visual Calendar Grid */}
                 <div className="lg:col-span-2 space-y-4">
-                  <div className="grid grid-cols-7 gap-1">
+                  <div className="grid grid-cols-7 gap-0.5 sm:gap-1">
                     {['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'].map(day => (
-                      <div key={day} className="text-[10px] font-black text-zinc-500 uppercase tracking-widest text-center py-2">
+                      <div key={day} className="text-[8px] sm:text-[10px] font-black text-zinc-500 uppercase tracking-widest text-center py-1 sm:py-2">
                         {day}
                       </div>
                     ))}
@@ -2611,9 +2653,9 @@ export default function App() {
                           <div 
                             key={idx}
                             className={cn(
-                              "aspect-square rounded-xl border p-1 flex flex-col items-center justify-between transition-all relative group",
+                              "aspect-square rounded-lg sm:rounded-xl border p-0.5 sm:p-1 flex flex-col items-center justify-between transition-all relative group",
                               !isCurrentMonth ? "opacity-20 border-transparent" : (theme === 'dark' ? "bg-zinc-800/20 border-zinc-800/50" : "bg-zinc-50 border-zinc-200"),
-                              isToday && "ring-2 ring-brand ring-offset-2 ring-offset-zinc-900"
+                              isToday && "ring-1 sm:ring-2 ring-brand ring-offset-1 sm:ring-offset-2 ring-offset-zinc-900"
                             )}
                           >
                             {/* Galactic Cell Background Glow (Clipped separately to allow tooltip overflow) */}
@@ -2629,7 +2671,7 @@ export default function App() {
 
                             <div className="w-full flex justify-between items-start relative z-10">
                               <span className={cn(
-                                "text-[10px] font-bold",
+                                "text-[8px] sm:text-[10px] font-bold",
                                 isToday ? "text-brand" : (theme === 'dark' ? "text-zinc-400" : "text-zinc-600")
                               )}>
                                 {format(day, 'd')}
@@ -2637,15 +2679,15 @@ export default function App() {
                               <div className="flex gap-0.5">
                                 {hasIncome && (
                                   <Triangle 
-                                    size={10} 
-                                    className="text-emerald-400 fill-emerald-400 drop-shadow-[0_0_8px_rgba(52,211,153,0.8)] animate-pulse" 
+                                    size={8} 
+                                    className="text-emerald-400 fill-emerald-400 drop-shadow-[0_0_8px_rgba(52,211,153,0.8)] animate-pulse sm:w-[10px] sm:h-[10px]" 
                                     title="Ganho" 
                                   />
                                 )}
                                 {hasExpense && (
                                   <Triangle 
-                                    size={10} 
-                                    className="text-rose-400 fill-rose-400 rotate-180 drop-shadow-[0_0_8px_rgba(251,113,133,0.8)] animate-pulse" 
+                                    size={8} 
+                                    className="text-rose-400 fill-rose-400 rotate-180 drop-shadow-[0_0_8px_rgba(251,113,133,0.8)] animate-pulse sm:w-[10px] sm:h-[10px]" 
                                     title="Gasto" 
                                   />
                                 )}
@@ -2653,14 +2695,14 @@ export default function App() {
                             </div>
                             
                             {dayReminders.length > 0 && (
-                              <div className="flex flex-col items-center gap-1">
-                                <Logo size="sm" showText={false} theme={theme} className="scale-75" />
+                              <div className="flex flex-col items-center gap-0.5 sm:gap-1">
+                                <Logo size="sm" showText={false} theme={theme} className="scale-[0.45] sm:scale-75 origin-center" />
                                 <div className="flex gap-0.5">
                                   {dayReminders.slice(0, 3).map((r, i) => (
                                     <div 
                                       key={i} 
                                       className={cn(
-                                        "w-1 h-1 rounded-full",
+                                        "w-0.5 h-0.5 sm:w-1 sm:h-1 rounded-full",
                                         r.isPaid ? "bg-emerald-500" : "bg-rose-500"
                                       )} 
                                     />
