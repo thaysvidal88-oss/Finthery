@@ -16,6 +16,17 @@ export interface Transaction {
     total: number;
     parentId: string;
   };
+  isRecurring?: boolean;
+  frequency?: 'monthly' | 'weekly' | 'yearly';
+  user_id?: string;
+}
+
+export interface BillReminder {
+  id: string;
+  title: string;
+  amount: number;
+  dueDate: string; // ISO string
+  isPaid: boolean;
   user_id?: string;
 }
 
@@ -48,13 +59,13 @@ export interface Category {
 }
 
 export const CATEGORIES: Category[] = [
-  { name: 'Alimentação', icon: '🍔', color: '#CA94C9' },
-  { name: 'Transporte', icon: '🚗', color: '#A56D9F' },
-  { name: 'Lazer', icon: '🎮', color: '#E2B8E1' },
-  { name: 'Saúde', icon: '🏥', color: '#CA94C9' },
-  { name: 'Educação', icon: '📚', color: '#A56D9F' },
-  { name: 'Moradia', icon: '🏠', color: '#E2B8E1' },
-  { name: 'Outros', icon: '📦', color: '#CA94C9' },
-  { name: 'Salário', icon: '💰', color: '#22C55E' },
-  { name: 'Investimentos', icon: '📈', color: '#3B82F6' },
+  { name: 'Alimentação', icon: '🍔', color: '#C084FC' }, // Lilás
+  { name: 'Transporte', icon: '🚗', color: '#818CF8' }, // Azul Indigo
+  { name: 'Lazer', icon: '🎮', color: '#F472B6' },      // Rosa Pastel
+  { name: 'Saúde', icon: '🏥', color: '#FB7185' },      // Rose Pastel
+  { name: 'Educação', icon: '📚', color: '#A78BFA' },   // Violeta
+  { name: 'Moradia', icon: '🏠', color: '#38BDF8' },    // Azul Claro
+  { name: 'Outros', icon: '📦', color: '#94A3B8' },     // Slate Pastel
+  { name: 'Salário', icon: '💰', color: '#34D399' },    // Verde Pastel
+  { name: 'Investimentos', icon: '📈', color: '#6366F1' }, // Indigo Vibrante
 ];

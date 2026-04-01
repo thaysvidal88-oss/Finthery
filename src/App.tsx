@@ -21,8 +21,15 @@ import {
   Loader2,
   Check,
   Sun,
-  Moon
+  Moon,
+  Sparkles,
+  Rocket,
+  Brain,
+  Repeat,
+  Bell,
+  Triangle
 } from 'lucide-react';
+import { GoogleGenAI } from "@google/genai";
 import { Toaster, toast } from 'sonner';
 import { 
   PieChart, 
@@ -47,10 +54,15 @@ import {
   parseISO,
   isAfter,
   startOfDay,
-  isBefore
+  isBefore,
+  eachDayOfInterval,
+  startOfWeek,
+  endOfWeek,
+  isSameMonth,
+  isSameDay
 } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { Transaction, Goal, Investment, CATEGORIES, TransactionType, PaymentMethod } from './types';
+import { Transaction, Goal, Investment, CATEGORIES, TransactionType, PaymentMethod, BillReminder } from './types';
 import { cn, formatCurrency, generateId } from './utils';
 import { supabase } from './lib/supabase';
 import { Auth } from './components/Auth';
@@ -190,6 +202,14 @@ export default function App() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [goals, setGoals] = useState<Goal[]>([]);
   const [investments, setInvestments] = useState<Investment[]>([]);
+  const [billReminders, setBillReminders] = useState<BillReminder[]>([]);
+  const [isAiLoading, setIsAiLoading] = useState(false);
+  const [aiInsight, setAiInsight] = useState<string | null>(null);
+  const [showAiModal, setShowAiModal] = useState(false);
+  const [showIndependenceModal, setShowIndependenceModal] = useState(false);
+  const [showCalendarModal, setShowCalendarModal] = useState(false);
+  const [isRecurring, setIsRecurring] = useState(false);
+  const [frequency, setFrequency] = useState<'monthly' | 'weekly' | 'yearly'>('monthly');
 
   const [dbError, setDbError] = useState<string | null>(null);
   const [showAdminPanel, setShowAdminPanel] = useState(false);
@@ -323,7 +343,50 @@ export default function App() {
     }
   };
 
+  const fetchAiInsights = async () => {
+    if (!session) return;
+    setIsAiLoading(true);
+    setAiInsight(null);
+    setShowAiModal(true);
+
+    try {
+      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
+      const model = ai.models.generateContent({
+        model: "gemini-3-flash-preview",
+        contents: `Analise meu histórico financeiro e dê dicas personalizadas com um tema galáctico/cósmico.
+        
+        Transações: ${JSON.stringify(currentMonthTransactions.map(t => ({ desc: t.description, amount: t.amount, type: t.type, cat: t.category })))}
+        Metas: ${JSON.stringify(goals.map(g => ({ title: g.title, target: g.targetAmount, current: g.currentAmount })))}
+        Investimentos: ${JSON.stringify(investments.map(i => ({ desc: i.description, amount: i.amount })))}
+        
+        Dê um insight curto e motivador, como um "Oráculo Cósmico". Use emojis espaciais.`,
+      });
+
+      const response = await model;
+      setAiInsight(response.text || "As estrelas estão nubladas hoje. Tente novamente mais tarde.");
+    } catch (error) {
+      console.error("Erro ao consultar o Oráculo:", error);
+      setAiInsight("Houve uma interferência nas comunicações intergalácticas. Verifique sua conexão com o vácuo.");
+    } finally {
+      setIsAiLoading(false);
+    }
+  };
+
+  const calculateFinancialIndependence = () => {
+    const totalInvested = investments.reduce((sum, i) => sum + i.amount, 0);
+    const monthlyContribution = investments.filter(i => i.type === 'monthly').reduce((sum, i) => sum + i.amount, 0);
+    const monthlyExpenses = transactions.filter(t => t.type === 'expense' && isWithinInterval(parseISO(t.date), { start: startOfMonth(currentDate), end: endOfMonth(currentDate) })).reduce((sum, t) => sum + t.amount, 0);
+    
+    // Simple 4% rule calculation
+    const targetAmount = monthlyExpenses * 12 * 25;
+    const remaining = Math.max(0, targetAmount - totalInvested);
+    const years = monthlyContribution > 0 ? remaining / (monthlyContribution * 12) : Infinity;
+
+    return { targetAmount, remaining, years };
+  };
+
   const [currentDate, setCurrentDate] = useState(new Date());
+  const [calendarDate, setCalendarDate] = useState(new Date());
   const [showAddModal, setShowAddModal] = useState(false);
   const [modalType, setModalType] = useState<TransactionType>('expense');
   const [editingTransactionId, setEditingTransactionId] = useState<string | null>(null);
@@ -376,22 +439,76 @@ export default function App() {
           { data: transactionsData, error: tError },
           { data: goalsData, error: gError },
           { data: investmentsData, error: iError },
+          { data: remindersData, error: rError },
           { data: profileData, error: pError }
         ] = await Promise.all([
           supabase.from('transactions').select('*').order('date', { ascending: false }),
           supabase.from('goals').select('*'),
           supabase.from('investments').select('*'),
+          supabase.from('bill_reminders').select('*'),
           supabase.from('profiles').select('full_name').eq('id', session.user.id).single()
         ]);
 
-        if (tError || gError || iError) {
-          console.error('Error fetching data:', { tError, gError, iError });
+        if (tError || gError || iError || (rError && rError.code !== '42P01')) {
+          console.error('Error fetching data:', { tError, gError, iError, rError });
           setDbError('Erro ao carregar dados do banco de dados.');
         }
 
-        if (transactionsData) setTransactions(transactionsData);
-        if (goalsData) setGoals(goalsData);
-        if (investmentsData) setInvestments(investmentsData);
+        if (transactionsData) {
+          const mappedTransactions: Transaction[] = transactionsData.map((t: any) => ({
+            id: t.id,
+            description: t.description,
+            amount: t.amount,
+            date: t.date,
+            category: t.category,
+            type: t.type,
+            paymentMethod: t.payment_method,
+            cardName: t.card_name,
+            cardColor: t.card_color,
+            installments: t.installments,
+            isRecurring: t.is_recurring,
+            frequency: t.frequency,
+            user_id: t.user_id
+          }));
+          setTransactions(mappedTransactions);
+        }
+        if (goalsData) {
+          const mappedGoals: Goal[] = goalsData.map((g: any) => ({
+            id: g.id,
+            title: g.title,
+            targetAmount: g.target_amount,
+            currentAmount: g.current_amount,
+            deadline: g.deadline,
+            type: g.type,
+            color: g.color,
+            user_id: g.user_id
+          }));
+          setGoals(mappedGoals);
+        }
+        if (investmentsData) {
+          const mappedInvestments: Investment[] = investmentsData.map((i: any) => ({
+            id: i.id,
+            description: i.description,
+            amount: i.amount,
+            targetAmount: i.target_amount,
+            date: i.date,
+            type: i.type,
+            color: i.color,
+            user_id: i.user_id
+          }));
+          setInvestments(mappedInvestments);
+        }
+        if (remindersData) {
+          const mappedReminders: BillReminder[] = remindersData.map((r: any) => ({
+            id: r.id,
+            title: r.title,
+            amount: r.amount,
+            dueDate: r.due_date,
+            isPaid: r.is_paid,
+            user_id: r.user_id
+          }));
+          setBillReminders(mappedReminders);
+        }
         
         if (profileData) {
           setUserName(profileData.full_name || session.user.user_metadata?.full_name || '');
@@ -615,9 +732,11 @@ export default function App() {
           date: parseISO(date).toISOString(),
           category,
           type: modalType,
-          paymentMethod,
-          cardName: (paymentMethod === 'Cartão de Crédito' || paymentMethod === 'Cartão de Débito') ? cardName : undefined,
-          cardColor: (paymentMethod === 'Cartão de Crédito' || paymentMethod === 'Cartão de Débito') ? cardColor : undefined,
+          payment_method: paymentMethod,
+          card_name: (paymentMethod === 'Cartão de Crédito' || paymentMethod === 'Cartão de Débito') ? cardName : undefined,
+          card_color: (paymentMethod === 'Cartão de Crédito' || paymentMethod === 'Cartão de Débito') ? cardColor : undefined,
+          is_recurring: isRecurring,
+          frequency: isRecurring ? frequency : undefined,
         };
 
         if (session) {
@@ -625,9 +744,22 @@ export default function App() {
           if (error) throw error;
         }
 
+        const localUpdated = {
+          description,
+          amount: baseAmount,
+          date: parseISO(date).toISOString(),
+          category,
+          type: modalType,
+          paymentMethod,
+          cardName: (paymentMethod === 'Cartão de Crédito' || paymentMethod === 'Cartão de Débito') ? cardName : undefined,
+          cardColor: (paymentMethod === 'Cartão de Crédito' || paymentMethod === 'Cartão de Débito') ? cardColor : undefined,
+          isRecurring,
+          frequency: isRecurring ? frequency : undefined,
+        };
+
         const updatedTransactions = transactions.map(t => {
           if (t.id === editingTransactionId) {
-            return { ...t, ...updatedTransaction };
+            return { ...t, ...localUpdated };
           }
           return t;
         });
@@ -650,12 +782,29 @@ export default function App() {
               total: numInstallments,
               parentId
             } : undefined,
+            isRecurring,
+            frequency: isRecurring ? frequency : undefined,
             user_id: session?.user.id
           });
         }
 
         if (session) {
-          const { error } = await supabase.from('transactions').insert(newTransactions);
+          const dbTransactions = newTransactions.map(t => ({
+            id: t.id,
+            description: t.description,
+            amount: t.amount,
+            date: t.date,
+            category: t.category,
+            type: t.type,
+            payment_method: t.paymentMethod,
+            card_name: t.cardName,
+            card_color: t.cardColor,
+            installments: t.installments,
+            is_recurring: t.isRecurring,
+            frequency: t.frequency,
+            user_id: t.user_id
+          }));
+          const { error } = await supabase.from('transactions').insert(dbTransactions);
           if (error) throw error;
         }
 
@@ -742,7 +891,16 @@ export default function App() {
 
     try {
       if (session) {
-        const { error } = await supabase.from('goals').insert(newGoal);
+        const { error } = await supabase.from('goals').insert({
+          id: newGoal.id,
+          title: newGoal.title,
+          target_amount: newGoal.targetAmount,
+          current_amount: newGoal.currentAmount,
+          deadline: newGoal.deadline,
+          type: newGoal.type,
+          color: newGoal.color,
+          user_id: newGoal.user_id
+        });
         if (error) throw error;
       }
 
@@ -770,7 +928,7 @@ export default function App() {
 
   const updateGoalAmount = async (id: string, amount: number) => {
     if (session) {
-      const { error } = await supabase.from('goals').update({ currentAmount: amount }).eq('id', id);
+      const { error } = await supabase.from('goals').update({ current_amount: amount }).eq('id', id);
       if (error) {
         console.error('Error updating goal:', error);
         return;
@@ -809,7 +967,21 @@ export default function App() {
 
     try {
       if (editingInvestmentId) {
-        const updatedInvestment = {
+        const dbInvestment = {
+          description: investmentDescription,
+          amount: parseFloat(investmentAmount),
+          target_amount: investmentTargetAmount ? parseFloat(investmentTargetAmount) : undefined,
+          date: investmentDate,
+          type: investmentType,
+          color: investmentColor
+        };
+
+        if (session) {
+          const { error } = await supabase.from('investments').update(dbInvestment).eq('id', editingInvestmentId);
+          if (error) throw error;
+        }
+
+        const localInvestment = {
           description: investmentDescription,
           amount: parseFloat(investmentAmount),
           targetAmount: investmentTargetAmount ? parseFloat(investmentTargetAmount) : undefined,
@@ -818,14 +990,9 @@ export default function App() {
           color: investmentColor
         };
 
-        if (session) {
-          const { error } = await supabase.from('investments').update(updatedInvestment).eq('id', editingInvestmentId);
-          if (error) throw error;
-        }
-
         setInvestments(investments.map(i => i.id === editingInvestmentId ? {
           ...i,
-          ...updatedInvestment
+          ...localInvestment
         } : i));
       } else {
         const newInvestment: Investment = {
@@ -840,7 +1007,17 @@ export default function App() {
         };
 
         if (session) {
-          const { error } = await supabase.from('investments').insert(newInvestment);
+          const dbInvestment = {
+            id: newInvestment.id,
+            description: newInvestment.description,
+            amount: newInvestment.amount,
+            target_amount: newInvestment.targetAmount,
+            date: newInvestment.date,
+            type: newInvestment.type,
+            color: newInvestment.color,
+            user_id: newInvestment.user_id
+          };
+          const { error } = await supabase.from('investments').insert(dbInvestment);
           if (error) throw error;
         }
 
@@ -1351,6 +1528,14 @@ export default function App() {
                 {categoryData.length > 0 ? (
                   <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
+                      <defs>
+                        {categoryData.map((entry, index) => (
+                          <linearGradient id={`colorGradient-${index}`} key={`colorGradient-${index}`} x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0%" stopColor={entry.color} stopOpacity={0.6}/>
+                            <stop offset="100%" stopColor={entry.color} stopOpacity={0.1}/>
+                          </linearGradient>
+                        ))}
+                      </defs>
                       <Pie
                         data={categoryData}
                         cx="50%"
@@ -1359,9 +1544,16 @@ export default function App() {
                         outerRadius={80}
                         paddingAngle={5}
                         dataKey="value"
+                        stroke="none"
                       >
                         {categoryData.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={entry.color} />
+                          <Cell 
+                            key={`cell-${index}`} 
+                            fill={`url(#colorGradient-${index})`}
+                            stroke={entry.color}
+                            strokeWidth={2}
+                            className="drop-shadow-[0_0_5px_rgba(255,255,255,0.2)]"
+                          />
                         ))}
                       </Pie>
                       <Tooltip 
@@ -1418,6 +1610,16 @@ export default function App() {
               )}>
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={[{ name: 'Balanço', ganhos: totals.income, gastos: totals.expense }]}>
+                    <defs>
+                      <linearGradient id="incomeGradient" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#34D399" stopOpacity={0.6}/>
+                        <stop offset="100%" stopColor="#34D399" stopOpacity={0.1}/>
+                      </linearGradient>
+                      <linearGradient id="expenseGradient" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#FB7185" stopOpacity={0.6}/>
+                        <stop offset="100%" stopColor="#FB7185" stopOpacity={0.1}/>
+                      </linearGradient>
+                    </defs>
                     <XAxis dataKey="name" stroke={theme === 'dark' ? "#52525b" : "#a1a1aa"} />
                     <YAxis stroke={theme === 'dark' ? "#52525b" : "#a1a1aa"} hide />
                     <Tooltip 
@@ -1431,8 +1633,22 @@ export default function App() {
                       cursor={{ fill: theme === 'dark' ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.02)' }}
                       formatter={(value: number) => formatCurrency(value)}
                     />
-                    <Bar dataKey="ganhos" fill="#10b981" radius={[4, 4, 0, 0]} />
-                    <Bar dataKey="gastos" fill="#f43f5e" radius={[4, 4, 0, 0]} />
+                    <Bar 
+                      dataKey="ganhos" 
+                      fill="url(#incomeGradient)" 
+                      stroke="#34D399"
+                      strokeWidth={2}
+                      radius={[8, 8, 0, 0]} 
+                      className="drop-shadow-[0_0_8px_rgba(52,211,153,0.3)]"
+                    />
+                    <Bar 
+                      dataKey="gastos" 
+                      fill="url(#expenseGradient)" 
+                      stroke="#FB7185"
+                      strokeWidth={2}
+                      radius={[8, 8, 0, 0]} 
+                      className="drop-shadow-[0_0_8px_rgba(251,113,133,0.3)]"
+                    />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -1466,10 +1682,19 @@ export default function App() {
                 </button>
               </div>
             </div>
-            <div className="divide-y divide-zinc-800 max-h-[400px] overflow-y-auto scrollbar-custom">
+            <div className={cn(
+              "divide-y max-h-[400px] overflow-y-auto scrollbar-custom",
+              theme === 'dark' ? "divide-zinc-800" : "divide-zinc-100"
+            )}>
               {currentMonthTransactions.length > 0 ? (
                 [...currentMonthTransactions].sort((a, b) => parseISO(b.date).getTime() - parseISO(a.date).getTime()).map(t => (
-                  <div key={t.id} className="p-4 flex items-center justify-between hover:bg-zinc-800/30 transition-colors group">
+                  <div 
+                    key={t.id} 
+                    className={cn(
+                      "p-4 flex items-center justify-between transition-colors group",
+                      theme === 'dark' ? "hover:bg-zinc-800/30" : "hover:bg-zinc-50"
+                    )}
+                  >
                     <div className="flex items-center gap-4">
                       <div className={cn(
                         "w-10 h-10 rounded-xl flex items-center justify-center text-xl",
@@ -1741,10 +1966,18 @@ export default function App() {
           </div>
 
           {/* Quick Tips / Info */}
-          <div className="bg-brand/10 border border-brand/20 p-6 rounded-3xl shadow-lg">
-            <h5 className="font-bold text-brand mb-2 flex items-center gap-2 uppercase tracking-widest text-xs">
-              💡 Dica do Mês
-            </h5>
+          <div className="bg-brand/10 border border-brand/20 p-6 rounded-3xl shadow-lg space-y-4">
+            <div className="flex justify-between items-center">
+              <h5 className="font-bold text-brand flex items-center gap-2 uppercase tracking-widest text-xs">
+                💡 Dica do Mês
+              </h5>
+              <button 
+                onClick={fetchAiInsights}
+                className="flex items-center gap-2 bg-brand text-white px-3 py-1.5 rounded-xl text-[10px] font-bold uppercase tracking-widest hover:scale-105 transition-all shadow-[0_0_15px_rgba(202,148,201,0.5)]"
+              >
+                <Brain size={14} /> Oráculo Cósmico
+              </button>
+            </div>
             <p className={cn(
               "text-sm leading-relaxed italic transition-colors duration-500",
               theme === 'dark' ? "text-zinc-300" : "text-zinc-700"
@@ -1764,6 +1997,34 @@ export default function App() {
                 "O segredo da riqueza não é ganhar muito, mas gastar menos do que se ganha e investir a diferença."
               ][currentDate.getMonth()]}
             </p>
+          </div>
+
+          {/* Cosmic Tools */}
+          <div className="grid grid-cols-2 gap-4">
+            <button 
+              onClick={() => setShowIndependenceModal(true)}
+              className={cn(
+                "flex flex-col items-center justify-center gap-3 p-6 rounded-3xl border transition-all duration-500 group",
+                theme === 'dark' ? "bg-zinc-900 border-zinc-800 hover:border-brand/50" : "bg-white border-zinc-200 hover:border-brand/50"
+              )}
+            >
+              <div className="bg-brand/10 p-3 rounded-2xl group-hover:scale-110 transition-transform">
+                <Rocket className="text-brand" size={24} />
+              </div>
+              <span className="text-[10px] font-black uppercase tracking-widest text-center">Independência Financeira</span>
+            </button>
+            <button 
+              onClick={() => setShowCalendarModal(true)}
+              className={cn(
+                "flex flex-col items-center justify-center gap-3 p-6 rounded-3xl border transition-all duration-500 group",
+                theme === 'dark' ? "bg-zinc-900 border-zinc-800 hover:border-brand/50" : "bg-white border-zinc-200 hover:border-brand/50"
+              )}
+            >
+              <div className="bg-brand/10 p-3 rounded-2xl group-hover:scale-110 transition-transform">
+                <Calendar className="text-brand" size={24} />
+              </div>
+              <span className="text-[10px] font-black uppercase tracking-widest text-center">Calendário Galáctico</span>
+            </button>
           </div>
         </div>
       </main>
@@ -2070,6 +2331,52 @@ export default function App() {
                 </div>
               )}
 
+              {modalType === 'expense' && (
+                <div className="space-y-4">
+                  <div className={cn(
+                    "flex items-center gap-3 p-4 rounded-2xl border transition-all duration-500",
+                    theme === 'dark' ? "bg-zinc-800/20 border-zinc-800/50" : "bg-zinc-50 border-zinc-200"
+                  )}>
+                    <Repeat className="text-brand" size={20} />
+                    <div className="flex-1">
+                      <p className="text-xs font-bold">Transação Recorrente?</p>
+                      <p className="text-[10px] text-zinc-500">Marcar como despesa fixa</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setIsRecurring(!isRecurring)}
+                      className={cn(
+                        "w-12 h-6 rounded-full transition-all relative",
+                        isRecurring ? "bg-brand" : "bg-zinc-700"
+                      )}
+                    >
+                      <div className={cn(
+                        "absolute top-1 w-4 h-4 bg-white rounded-full transition-all",
+                        isRecurring ? "left-7" : "left-1"
+                      )} />
+                    </button>
+                  </div>
+
+                  {isRecurring && (
+                    <div className="animate-in fade-in slide-in-from-top-2">
+                      <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-1">Frequência</label>
+                      <select 
+                        value={frequency}
+                        onChange={(e) => setFrequency(e.target.value as any)}
+                        className={cn(
+                          "w-full border rounded-xl px-4 py-3 focus:outline-none focus:border-brand transition-all duration-500 font-bold",
+                          theme === 'dark' ? "bg-zinc-800 border-zinc-700 text-white" : "bg-zinc-50 border-zinc-200 text-zinc-900"
+                        )}
+                      >
+                        <option value="monthly">Mensal</option>
+                        <option value="weekly">Semanal</option>
+                        <option value="yearly">Anual</option>
+                      </select>
+                    </div>
+                  )}
+                </div>
+              )}
+
               <div className="flex gap-3 pt-4">
                 <button 
                   type="button"
@@ -2094,7 +2401,470 @@ export default function App() {
         </div>
       )}
 
-      {/* Add Goal Modal */}
+      {/* AI Insights Modal */}
+      <AnimatePresence>
+        {showAiModal && (
+          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-[60]">
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className={cn(
+                "border w-full max-w-lg rounded-3xl p-8 shadow-2xl relative overflow-hidden",
+                theme === 'dark' ? "bg-zinc-900 border-zinc-800" : "bg-white border-zinc-200"
+              )}
+            >
+              {/* Galaxy Background Effect */}
+              <div className="absolute inset-0 pointer-events-none opacity-20">
+                <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_50%_50%,#a855f7_0%,transparent_70%)] blur-3xl" />
+              </div>
+
+              <div className="relative z-10">
+                <div className="flex justify-between items-center mb-6">
+                  <h3 className="text-2xl font-black flex items-center gap-3 uppercase tracking-tighter">
+                    <Brain className="text-brand animate-pulse" size={32} /> Oráculo Cósmico
+                  </h3>
+                  <button onClick={() => setShowAiModal(false)} className="text-zinc-500 hover:text-white transition-colors">
+                    <Plus className="rotate-45" size={24} />
+                  </button>
+                </div>
+
+                <div className={cn(
+                  "min-h-[200px] flex flex-col items-center justify-center text-center p-6 rounded-2xl border border-dashed",
+                  theme === 'dark' ? "bg-zinc-800/30 border-zinc-700" : "bg-zinc-50 border-zinc-200"
+                )}>
+                  {isAiLoading ? (
+                    <div className="space-y-4">
+                      <Loader2 className="animate-spin text-brand mx-auto" size={48} />
+                      <p className="text-zinc-500 italic animate-pulse">Consultando as estrelas...</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      <Sparkles className="text-brand mx-auto" size={32} />
+                      <p className={cn(
+                        "text-lg leading-relaxed font-medium italic",
+                        theme === 'dark' ? "text-zinc-200" : "text-zinc-800"
+                      )}>
+                        "{aiInsight}"
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                <button 
+                  onClick={() => setShowAiModal(false)}
+                  className="w-full mt-6 bg-brand hover:bg-brand-dark text-white font-black py-4 rounded-2xl transition-all uppercase tracking-widest text-xs shadow-lg shadow-brand/20"
+                >
+                  Entendido, Mestre
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Financial Independence Modal */}
+      <AnimatePresence>
+        {showIndependenceModal && (
+          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-[60]">
+            <motion.div 
+              initial={{ y: 50, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: 50, opacity: 0 }}
+              className={cn(
+                "border w-full max-w-md rounded-3xl p-8 shadow-2xl transition-all duration-500",
+                theme === 'dark' ? "bg-zinc-900 border-zinc-800" : "bg-white border-zinc-200"
+              )}
+            >
+              <div className="flex justify-between items-center mb-6">
+                <h3 className="text-2xl font-black flex items-center gap-3 uppercase tracking-tighter">
+                  <Rocket className="text-brand" size={32} /> Rumo às Estrelas
+                </h3>
+                <button onClick={() => setShowIndependenceModal(false)} className="text-zinc-500 hover:text-white transition-colors">
+                  <Plus className="rotate-45" size={24} />
+                </button>
+              </div>
+
+              {(() => {
+                const { targetAmount, remaining, years } = calculateFinancialIndependence();
+                return (
+                  <div className="space-y-6">
+                    <div className={cn(
+                      "p-6 rounded-2xl text-center border",
+                      theme === 'dark' ? "bg-zinc-800/30 border-zinc-700" : "bg-zinc-50 border-zinc-200"
+                    )}>
+                      <p className="text-[10px] text-zinc-500 uppercase tracking-[0.2em] mb-2 font-bold">Alvo de Independência</p>
+                      <p className="text-3xl font-black text-brand">{formatCurrency(targetAmount)}</p>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className={cn(
+                        "p-4 rounded-2xl border",
+                        theme === 'dark' ? "bg-zinc-800/30 border-zinc-700" : "bg-zinc-50 border-zinc-200"
+                      )}>
+                        <p className="text-[8px] text-zinc-500 uppercase tracking-widest mb-1 font-bold">Falta percorrer</p>
+                        <p className="text-sm font-black text-rose-400">{formatCurrency(remaining)}</p>
+                      </div>
+                      <div className={cn(
+                        "p-4 rounded-2xl border",
+                        theme === 'dark' ? "bg-zinc-800/30 border-zinc-700" : "bg-zinc-50 border-zinc-200"
+                      )}>
+                        <p className="text-[8px] text-zinc-500 uppercase tracking-widest mb-1 font-bold">Tempo estimado</p>
+                        <p className="text-sm font-black text-emerald-400">
+                          {years === Infinity ? 'Infinito' : `${years.toFixed(1)} anos`}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="bg-brand/5 p-4 rounded-2xl border border-brand/10">
+                      <p className="text-xs italic text-zinc-500 text-center">
+                        "A liberdade financeira é o combustível que permite sua nave alcançar galáxias distantes."
+                      </p>
+                    </div>
+
+                    <button 
+                      onClick={() => setShowIndependenceModal(false)}
+                      className="w-full bg-brand hover:bg-brand-dark text-white font-black py-4 rounded-2xl transition-all uppercase tracking-widest text-xs"
+                    >
+                      Continuar Jornada
+                    </button>
+                  </div>
+                );
+              })()}
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Galactic Calendar Modal */}
+      <AnimatePresence>
+        {showCalendarModal && (
+          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-[60]">
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className={cn(
+                "border w-full max-w-4xl rounded-3xl p-8 shadow-2xl transition-all duration-500 overflow-y-auto max-h-[90vh] relative",
+                theme === 'dark' ? "bg-zinc-900 border-zinc-800" : "bg-white border-zinc-200"
+              )}
+            >
+              {/* Galactic Background Effect */}
+              <div className="absolute inset-0 pointer-events-none opacity-[0.03] overflow-hidden rounded-3xl">
+                <div className="absolute top-[-20%] left-[-20%] w-[140%] h-[140%] bg-[radial-gradient(circle_at_50%_50%,#CA94C9_0%,transparent_70%)]" />
+              </div>
+
+              <div className="flex justify-between items-center mb-6 relative z-10">
+                <h3 className="text-2xl font-black flex items-center gap-3 uppercase tracking-tighter">
+                  <Calendar className="text-brand" size={32} /> Calendário Galáctico
+                </h3>
+                <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-2 bg-zinc-800/50 p-1 rounded-xl border border-zinc-700">
+                    <button 
+                      onClick={() => setCalendarDate(subMonths(calendarDate, 1))}
+                      className="p-2 hover:bg-zinc-700 rounded-lg transition-all text-zinc-400 hover:text-white"
+                    >
+                      <ChevronLeft size={20} />
+                    </button>
+                    <span className="text-sm font-black uppercase tracking-widest px-2 min-w-[120px] text-center">
+                      {format(calendarDate, 'MMMM yyyy', { locale: ptBR })}
+                    </span>
+                    <button 
+                      onClick={() => setCalendarDate(addMonths(calendarDate, 1))}
+                      className="p-2 hover:bg-zinc-700 rounded-lg transition-all text-zinc-400 hover:text-white"
+                    >
+                      <ChevronRight size={20} />
+                    </button>
+                  </div>
+                  <button onClick={() => setShowCalendarModal(false)} className="text-zinc-500 hover:text-white transition-colors">
+                    <Plus className="rotate-45" size={24} />
+                  </button>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                {/* Visual Calendar Grid */}
+                <div className="lg:col-span-2 space-y-4">
+                  <div className="grid grid-cols-7 gap-1">
+                    {['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'].map(day => (
+                      <div key={day} className="text-[10px] font-black text-zinc-500 uppercase tracking-widest text-center py-2">
+                        {day}
+                      </div>
+                    ))}
+                    {(() => {
+                      const monthStart = startOfMonth(calendarDate);
+                      const monthEnd = endOfMonth(monthStart);
+                      const startDate = startOfWeek(monthStart);
+                      const endDate = endOfWeek(monthEnd);
+                      const calendarDays = eachDayOfInterval({ start: startDate, end: endDate });
+
+                      return calendarDays.map((day, idx) => {
+                        const dayReminders = billReminders.filter(r => isSameDay(parseISO(r.dueDate), day));
+                        const dayTransactions = transactions.filter(t => isSameDay(parseISO(t.date), day));
+                        const hasIncome = dayTransactions.some(t => t.type === 'income');
+                        const hasExpense = dayTransactions.some(t => t.type === 'expense');
+                        
+                        const isCurrentMonth = isSameMonth(day, monthStart);
+                        const isToday = isSameDay(day, new Date());
+
+                        return (
+                          <div 
+                            key={idx}
+                            className={cn(
+                              "aspect-square rounded-xl border p-1 flex flex-col items-center justify-between transition-all relative group",
+                              !isCurrentMonth ? "opacity-20 border-transparent" : (theme === 'dark' ? "bg-zinc-800/20 border-zinc-800/50" : "bg-zinc-50 border-zinc-200"),
+                              isToday && "ring-2 ring-brand ring-offset-2 ring-offset-zinc-900"
+                            )}
+                          >
+                            {/* Galactic Cell Background Glow (Clipped separately to allow tooltip overflow) */}
+                            {isCurrentMonth && (hasIncome || hasExpense) && (
+                              <div className="absolute inset-0 overflow-hidden rounded-xl pointer-events-none">
+                                <div className={cn(
+                                  "absolute inset-0 opacity-[0.12] blur-xl",
+                                  hasIncome && hasExpense ? "bg-gradient-to-br from-emerald-500 to-rose-500" :
+                                  hasIncome ? "bg-emerald-500" : "bg-rose-500"
+                                )} />
+                              </div>
+                            )}
+
+                            <div className="w-full flex justify-between items-start relative z-10">
+                              <span className={cn(
+                                "text-[10px] font-bold",
+                                isToday ? "text-brand" : (theme === 'dark' ? "text-zinc-400" : "text-zinc-600")
+                              )}>
+                                {format(day, 'd')}
+                              </span>
+                              <div className="flex gap-0.5">
+                                {hasIncome && (
+                                  <Triangle 
+                                    size={10} 
+                                    className="text-emerald-400 fill-emerald-400 drop-shadow-[0_0_8px_rgba(52,211,153,0.8)] animate-pulse" 
+                                    title="Ganho" 
+                                  />
+                                )}
+                                {hasExpense && (
+                                  <Triangle 
+                                    size={10} 
+                                    className="text-rose-400 fill-rose-400 rotate-180 drop-shadow-[0_0_8px_rgba(251,113,133,0.8)] animate-pulse" 
+                                    title="Gasto" 
+                                  />
+                                )}
+                              </div>
+                            </div>
+                            
+                            {dayReminders.length > 0 && (
+                              <div className="flex flex-col items-center gap-1">
+                                <Logo size="sm" showText={false} theme={theme} className="scale-75" />
+                                <div className="flex gap-0.5">
+                                  {dayReminders.slice(0, 3).map((r, i) => (
+                                    <div 
+                                      key={i} 
+                                      className={cn(
+                                        "w-1 h-1 rounded-full",
+                                        r.isPaid ? "bg-emerald-500" : "bg-rose-500"
+                                      )} 
+                                    />
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Hover Tooltip for Reminders & Transactions */}
+                            {(dayReminders.length > 0 || dayTransactions.length > 0) && (
+                              <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-40 bg-zinc-900 border border-zinc-800 rounded-lg p-2 opacity-0 group-hover:opacity-100 pointer-events-none transition-all z-20 shadow-xl">
+                                {dayReminders.length > 0 && (
+                                  <div className="mb-2">
+                                    <p className="text-[7px] uppercase font-black text-zinc-500 mb-1">Lembretes</p>
+                                    {dayReminders.map(r => (
+                                      <div key={r.id} className="text-[8px] font-bold flex justify-between gap-1 border-b border-zinc-800 last:border-0 py-1">
+                                        <span className="truncate">{r.title}</span>
+                                        <span className={r.isPaid ? "text-emerald-500" : "text-rose-500"}>{formatCurrency(r.amount)}</span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                                {dayTransactions.length > 0 && (
+                                  <div>
+                                    <p className="text-[7px] uppercase font-black text-zinc-500 mb-1">Transações</p>
+                                    {dayTransactions.map(t => (
+                                      <div key={t.id} className="text-[8px] font-bold flex justify-between gap-1 border-b border-zinc-800 last:border-0 py-1">
+                                        <span className="truncate">{t.description}</span>
+                                        <span className={t.type === 'income' ? "text-emerald-500" : "text-rose-500"}>
+                                          {t.type === 'income' ? '+' : '-'}{formatCurrency(t.amount)}
+                                        </span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      });
+                    })()}
+                  </div>
+                </div>
+
+                {/* Sidebar: Form & List */}
+                <div className="space-y-8">
+                  {/* Add Reminder Form */}
+                  <div className="space-y-4">
+                    <h4 className="text-xs font-black uppercase tracking-widest text-zinc-500">Novo Lembrete</h4>
+                    <div className="space-y-3">
+                      <input 
+                        type="text" 
+                        placeholder="Título da conta"
+                        id="reminder-title"
+                        className={cn(
+                          "w-full border rounded-xl px-4 py-3 focus:outline-none focus:border-brand transition-all text-sm font-bold",
+                          theme === 'dark' ? "bg-zinc-800 border-zinc-700 text-white" : "bg-zinc-50 border-zinc-200 text-zinc-900"
+                        )}
+                      />
+                      <div className="grid grid-cols-2 gap-2">
+                        <input 
+                          type="number" 
+                          placeholder="Valor"
+                          id="reminder-amount"
+                          className={cn(
+                            "w-full border rounded-xl px-4 py-3 focus:outline-none focus:border-brand transition-all text-sm font-bold",
+                            theme === 'dark' ? "bg-zinc-800 border-zinc-700 text-white" : "bg-zinc-50 border-zinc-200 text-zinc-900"
+                          )}
+                        />
+                        <input 
+                          type="date" 
+                          id="reminder-date"
+                          className={cn(
+                            "w-full border rounded-xl px-4 py-3 focus:outline-none focus:border-brand transition-all text-sm font-bold",
+                            theme === 'dark' ? "bg-zinc-800 border-zinc-700 text-white" : "bg-zinc-50 border-zinc-200 text-zinc-900"
+                          )}
+                        />
+                      </div>
+                      <button 
+                        onClick={async () => {
+                          const title = (document.getElementById('reminder-title') as HTMLInputElement).value;
+                          const amount = parseFloat((document.getElementById('reminder-amount') as HTMLInputElement).value);
+                          const date = (document.getElementById('reminder-date') as HTMLInputElement).value;
+                          
+                          if (!title || isNaN(amount) || !date) {
+                            toast.error("Preencha todos os campos!");
+                            return;
+                          }
+
+                          const newReminder: BillReminder = {
+                            id: generateId(),
+                            title,
+                            amount,
+                            dueDate: parseISO(date).toISOString(),
+                            isPaid: false,
+                            user_id: session?.user.id
+                          };
+
+                          if (session) {
+                            const { error } = await supabase.from('bill_reminders').insert({
+                              id: newReminder.id,
+                              title: newReminder.title,
+                              amount: newReminder.amount,
+                              due_date: newReminder.dueDate,
+                              is_paid: newReminder.isPaid,
+                              user_id: newReminder.user_id
+                            });
+                            if (error) {
+                              console.error('Error saving reminder:', error);
+                              toast.error("Erro ao salvar no banco de dados.");
+                              return;
+                            }
+                          }
+                          setBillReminders([...billReminders, newReminder]);
+                          
+                          (document.getElementById('reminder-title') as HTMLInputElement).value = '';
+                          (document.getElementById('reminder-amount') as HTMLInputElement).value = '';
+                          (document.getElementById('reminder-date') as HTMLInputElement).value = '';
+                          toast.success("Lembrete agendado com sucesso!");
+                        }}
+                        className="w-full bg-brand hover:bg-brand-dark text-white font-black py-3 rounded-xl transition-all uppercase tracking-widest text-[10px] shadow-lg shadow-brand/20"
+                      >
+                        Agendar Lembrete
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Reminders List for Selected Month */}
+                  <div className="space-y-4">
+                    <h4 className="text-xs font-black uppercase tracking-widest text-zinc-500">Contas do Mês</h4>
+                    <div className="space-y-3 max-h-[300px] overflow-y-auto pr-2 scrollbar-custom">
+                      {billReminders.filter(r => isSameMonth(parseISO(r.dueDate), calendarDate)).length > 0 ? 
+                        [...billReminders]
+                          .filter(r => isSameMonth(parseISO(r.dueDate), calendarDate))
+                          .sort((a, b) => parseISO(a.dueDate).getTime() - parseISO(b.dueDate).getTime())
+                          .map(reminder => (
+                        <div 
+                          key={reminder.id}
+                          className={cn(
+                            "p-4 rounded-2xl border flex justify-between items-center group transition-all",
+                            theme === 'dark' ? "bg-zinc-800/20 border-zinc-800/50 hover:border-brand/30" : "bg-zinc-50 border-zinc-200 hover:border-brand/30"
+                          )}
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className={cn(
+                              "w-8 h-8 rounded-lg flex items-center justify-center",
+                              reminder.isPaid ? "bg-emerald-500/10 text-emerald-500" : "bg-rose-500/10 text-rose-500"
+                            )}>
+                              <Bell size={16} />
+                            </div>
+                            <div>
+                              <p className="text-xs font-bold">{reminder.title}</p>
+                              <p className="text-[10px] text-zinc-500 uppercase tracking-tighter">
+                                {format(parseISO(reminder.dueDate), 'dd/MM')} • {formatCurrency(reminder.amount)}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <button 
+                              onClick={async () => {
+                                const updated = { ...reminder, isPaid: !reminder.isPaid };
+                                if (session) {
+                                  const { error } = await supabase.from('bill_reminders').update({ is_paid: updated.isPaid }).eq('id', reminder.id);
+                                  if (error) {
+                                    console.error('Error updating reminder:', error);
+                                    toast.error("Erro ao atualizar no banco.");
+                                    return;
+                                  }
+                                }
+                                setBillReminders(billReminders.map(r => r.id === reminder.id ? updated : r));
+                              }}
+                              className={cn(
+                                "p-2 rounded-lg transition-all",
+                                reminder.isPaid ? "text-emerald-500 bg-emerald-500/10" : "text-zinc-500 hover:text-emerald-500 hover:bg-emerald-500/10"
+                              )}
+                            >
+                              <Check size={14} />
+                            </button>
+                            <button 
+                              onClick={async () => {
+                                if (session) {
+                                  await supabase.from('bill_reminders').delete().eq('id', reminder.id);
+                                }
+                                setBillReminders(billReminders.filter(r => r.id !== reminder.id));
+                              }}
+                              className="text-zinc-600 hover:text-rose-500 p-2 rounded-lg transition-all"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
+                        </div>
+                      )) : (
+                        <div className="text-center py-8 text-zinc-500 italic text-xs">
+                          Nenhuma conta para este mês
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
       {/* Goal Modal */}
       {showGoalModal && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
