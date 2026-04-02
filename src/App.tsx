@@ -552,8 +552,16 @@ export default function App() {
       return;
     }
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
+    supabase.auth.getSession().then(({ data: { session }, error }) => {
+      if (error && error.message.includes('Refresh Token Not Found')) {
+        supabase.auth.signOut();
+        setSession(null);
+      } else {
+        setSession(session);
+      }
+      setLoading(false);
+    }).catch(err => {
+      console.error('Error getting session:', err);
       setLoading(false);
     });
 
@@ -561,6 +569,9 @@ export default function App() {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event, session) => {
       setSession(session);
+      if (event === 'INITIAL_SESSION' && !session) {
+        // Handle initial load if session is missing
+      }
       if (event === 'PASSWORD_RECOVERY') {
         setIsResettingPassword(true);
       }
@@ -576,12 +587,12 @@ export default function App() {
     const fetchData = async () => {
       try {
         const [
-          { data: transactionsData, error: tError },
-          { data: goalsData, error: gError },
-          { data: investmentsData, error: iError },
-          { data: remindersData, error: rError },
-          { data: profileData, error: pError }
-        ] = await Promise.all([
+          tResult,
+          gResult,
+          iResult,
+          rResult,
+          pResult
+        ] = await Promise.allSettled([
           supabase.from('transactions').select('*').order('date', { ascending: false }),
           supabase.from('goals').select('*'),
           supabase.from('investments').select('*'),
@@ -589,9 +600,29 @@ export default function App() {
           supabase.from('profiles').select('full_name').eq('id', session.user.id).single()
         ]);
 
+        const transactionsData = tResult.status === 'fulfilled' ? tResult.value.data : null;
+        const tError = tResult.status === 'fulfilled' ? tResult.value.error : tResult.reason;
+        
+        const goalsData = gResult.status === 'fulfilled' ? gResult.value.data : null;
+        const gError = gResult.status === 'fulfilled' ? gResult.value.error : gResult.reason;
+        
+        const investmentsData = iResult.status === 'fulfilled' ? iResult.value.data : null;
+        const iError = iResult.status === 'fulfilled' ? iResult.value.error : iResult.reason;
+        
+        const remindersData = rResult.status === 'fulfilled' ? rResult.value.data : null;
+        const rError = rResult.status === 'fulfilled' ? rResult.value.error : rResult.reason;
+        
+        const profileData = pResult.status === 'fulfilled' ? pResult.value.data : null;
+        const pError = pResult.status === 'fulfilled' ? pResult.value.error : pResult.reason;
+
         if (tError || gError || iError || (rError && rError.code !== '42P01')) {
-          console.error('Error fetching data:', { tError, gError, iError, rError });
-          setDbError('Erro ao carregar dados do banco de dados.');
+          console.error('Error fetching data:', { tError, gError, iError, rError, pError });
+          
+          if (tError?.message?.includes('Failed to fetch') || gError?.message?.includes('Failed to fetch')) {
+            setDbError('Erro de conexão: Não foi possível alcançar o banco de dados. Verifique sua internet ou a configuração do Supabase.');
+          } else {
+            setDbError('Erro ao carregar dados do banco de dados.');
+          }
         }
 
         if (transactionsData) {
